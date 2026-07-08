@@ -31,12 +31,12 @@ export default function StadiumHeatMap() {
           <div className="text-slate-500 font-bold tracking-widest">PITCH</div>
           
           {/* Gate A */}
-          <div className={`absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-12 rounded-lg border-2 flex items-center justify-center text-xs font-bold text-white transition-colors duration-500 ${getCongestionColor(liveData.gateCongestion?.GATE_A?.status || 'low')}`}>
+          <div className={`absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-12 rounded-lg border-2 flex items-center justify-center text-xs font-bold text-white transition-colors duration-500 ${getCongestionColor(liveData.congestion?.['Gate A']?.level?.toLowerCase() || 'low')}`}>
             GATE A
           </div>
 
           {/* Gate B */}
-          <div className={`absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-12 h-20 rounded-lg border-2 flex items-center justify-center text-xs font-bold text-white transition-colors duration-500 ${getCongestionColor(liveData.gateCongestion?.GATE_B?.status || 'low')}`}>
+          <div className={`absolute top-1/2 right-0 translate-x-1/2 -translate-y-1/2 w-12 h-20 rounded-lg border-2 flex items-center justify-center text-xs font-bold text-white transition-colors duration-500 ${getCongestionColor(liveData.congestion?.['Gate B']?.level?.toLowerCase() || 'low')}`}>
             <span className="-rotate-90 block">GATE B</span>
           </div>
 
@@ -46,7 +46,7 @@ export default function StadiumHeatMap() {
           </div>
 
           {/* Concourse 1 */}
-          <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 w-40 h-10 rounded-full border-2 flex items-center justify-center text-xs font-bold text-white transition-colors duration-500 ${getCongestionColor(liveData.concourseCongestion?.CONCOURSE_1?.status || 'low')}`}>
+          <div className={`absolute bottom-4 left-1/2 -translate-x-1/2 w-40 h-10 rounded-full border-2 flex items-center justify-center text-xs font-bold text-white transition-colors duration-500 ${getCongestionColor(liveData.congestion?.['Food Court North']?.level?.toLowerCase() || 'low')}`}>
             CONCOURSE 1
           </div>
         </div>

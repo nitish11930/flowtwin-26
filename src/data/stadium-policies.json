@@ -4,10 +4,10 @@
       "category": "Lost Child",
       "protocol": "Code Amber",
       "instructions": [
-        "Immediately notify the nearest usher or security guard.",
-        "Provide a detailed description of the child (age, clothing, last seen location).",
-        "Wait at the exact location where you lost sight of them.",
-        "Security will initiate a sector-wide lockdown until the child is located."
+        "Keep the reporting person at the exact location where the child was last seen.",
+        "Notify nearest security guard or usher immediately.",
+        "Collect child name, age, clothing, guardian contact, last seen location, and time.",
+        "Create Code Amber incident."
       ],
       "contactLocation": "Guest Services Desk at Section 112"
     },
@@ -15,10 +15,10 @@
       "category": "Medical Emergency",
       "protocol": "Code Red",
       "instructions": [
-        "Do not move the individual unless they are in immediate danger.",
-        "Alert an usher or use the FlowTwin app emergency button.",
-        "State the exact section, row, and seat number.",
-        "First aid response team targets a 3-minute arrival."
+        "Call first aid or medical dispatch immediately.",
+        "Do not move the person unless there is immediate danger.",
+        "Keep crowd away and assign one volunteer to guide medical staff.",
+        "Collect symptoms, location, and consciousness/breathing status."
       ],
       "contactLocation": "First Aid stations at Sections 105, 215, 330"
     },
@@ -26,11 +26,22 @@
       "category": "Accessibility",
       "protocol": "Access Assist",
       "instructions": [
-        "All main gates (A, B) have dedicated accessible entry lanes.",
-        "Wheelchair escorts are available upon request at entry.",
-        "Accessible seating requires verified ticketing."
+        "Use accessible gates A and B.",
+        "Use elevators E1/E2 when available.",
+        "Guide wheelchair users away from high-crowd gates."
       ],
       "contactLocation": "ADA Assistance Kiosk at Gate A"
+    },
+    {
+      "category": "Crowd Control",
+      "protocol": "Crowd Management",
+      "instructions": [
+        "Redirect fans away from crowded gates.",
+        "Use calm short instructions.",
+        "Escalate if crowd pressure is rising.",
+        "Never tell volunteers to physically push or block fans."
+      ],
+      "contactLocation": "Ops Dashboard Incident Escalation"
     }
   ]
 }

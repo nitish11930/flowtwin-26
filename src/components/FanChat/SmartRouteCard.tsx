@@ -19,11 +19,11 @@ export default function SmartRouteCard({ routeData }: { routeData: RouteScoreRes
       </div>
 
       <div className="space-y-3 p-3 bg-slate-50 rounded-xl border border-slate-100">
-        {routeData.path.map((node: string, idx: number) => (
+        {[routeData.route.startPoint, routeData.route.endPoint].map((node: string, idx: number, arr: string[]) => (
           <div key={idx} className="flex items-center">
             <div className="relative flex flex-col items-center mr-3">
-              <div className={`h-4 w-4 rounded-full flex items-center justify-center shadow-sm border-2 border-white ${idx === 0 ? 'bg-blue-500' : idx === routeData.path.length - 1 ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-              {idx < routeData.path.length - 1 && (
+              <div className={`h-4 w-4 rounded-full flex items-center justify-center shadow-sm border-2 border-white ${idx === 0 ? 'bg-blue-500' : idx === arr.length - 1 ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+              {idx < arr.length - 1 && (
                 <div className="h-6 w-0.5 bg-slate-300 my-1 rounded-full" />
               )}
             </div>

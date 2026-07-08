@@ -4,7 +4,7 @@ import { Activity, Clock, Users, Train, AlertCircle } from 'lucide-react';
 import { useSharedState } from '@/lib/store';
 
 export default function MetricsPanel() {
-  const { state } = useSharedState();
+  const { state, setSharedState } = useSharedState();
 
   return (
     <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 flex flex-col h-full shadow-lg">
