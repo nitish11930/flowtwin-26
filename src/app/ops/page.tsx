@@ -16,15 +16,15 @@ export default function OpsDashboard() {
             FlowTwin Operations Command
           </h1>
         </div>
-        <div className="flex items-center gap-4">
-          <button className="relative p-2 text-slate-400 hover:text-white transition-colors bg-slate-800 rounded-full border border-slate-700">
-            <Bell className="h-5 w-5" />
+        <nav className="flex items-center gap-4" aria-label="Dashboard Navigation">
+          <button aria-label="Notifications" className="relative p-2 text-slate-200 hover:text-white transition-colors bg-slate-800 rounded-full border border-slate-600 focus:outline-none focus:ring-2 focus:ring-slate-400">
+            <Bell className="h-5 w-5" aria-hidden="true" />
             <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-red-500"></span>
           </button>
-          <div className="h-8 w-8 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-emerald-400 font-bold text-sm">
+          <div aria-label="User Profile" className="h-8 w-8 rounded-full bg-emerald-500/20 border border-emerald-500/50 flex items-center justify-center text-emerald-300 font-bold text-sm">
             JS
           </div>
-        </div>
+        </nav>
       </header>
       
       <main className="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 max-w-7xl mx-auto w-full">

@@ -81,14 +81,14 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-140px)] bg-white rounded-3xl border-2 border-slate-200 overflow-hidden shadow-lg">
-      <div className="bg-blue-600 p-4 text-center font-bold text-white shadow-sm">
+    <section aria-label="Assistance Chat" className="flex flex-col h-[calc(100vh-140px)] bg-white rounded-3xl border-2 border-slate-200 overflow-hidden shadow-lg">
+      <header className="bg-blue-600 p-4 text-center font-bold text-white shadow-sm">
         Assistance Chat
-      </div>
+      </header>
       
-      <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50">
+      <div className="flex-1 overflow-y-auto p-4 space-y-6 bg-slate-50" aria-live="polite">
         {messages.map(msg => (
-          <div key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+          <article key={msg.id} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
             <div className={`flex max-w-[95%] ${msg.sender === 'user' ? 'flex-row-reverse' : 'flex-row'}`}>
               <div className={`flex-shrink-0 h-10 w-10 rounded-full flex items-center justify-center shadow-md border-2 border-white ${msg.sender === 'user' ? 'bg-slate-800 ml-3' : 'bg-blue-600 mr-3'}`}>
                 {msg.sender === 'user' ? <User size={20} className="text-white" /> : <Bot size={20} className="text-white" />}
@@ -100,7 +100,7 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
                 {msg.routeData && <SmartRouteCard routeData={msg.routeData} />}
               </div>
             </div>
-          </div>
+          </article>
         ))}
         {isTyping && (
           <div className="flex justify-start">
@@ -117,7 +117,7 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
         )}
       </div>
 
-      <div className="p-4 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
+      <footer className="p-4 bg-white border-t border-slate-200 shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)]">
         <div className="relative">
           <input 
             type="text" 
@@ -125,16 +125,18 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSend()}
             placeholder="Type your destination or needs..."
-            className="w-full bg-slate-100 border-2 border-slate-200 text-slate-900 rounded-full py-4 pl-6 pr-16 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors placeholder:text-slate-500 font-medium text-sm"
+            aria-label="Message input"
+            className="w-full bg-slate-100 border-2 border-slate-200 text-slate-900 rounded-full py-4 pl-6 pr-16 focus:outline-none focus:border-blue-500 focus:bg-white transition-colors placeholder:text-slate-600 font-medium text-sm"
           />
           <button 
             onClick={handleSend}
-            className="absolute right-2 top-2 bottom-2 aspect-square flex items-center justify-center bg-blue-600 hover:bg-blue-700 rounded-full text-white transition-colors shadow-md"
+            aria-label="Send message"
+            className="absolute right-2 top-2 bottom-2 aspect-square flex items-center justify-center bg-blue-600 hover:bg-blue-700 rounded-full text-white transition-colors shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
           >
-            <Send size={16} className="ml-1" />
+            <Send size={16} className="ml-1" aria-hidden="true" />
           </button>
         </div>
-      </div>
-    </div>
+      </footer>
+    </section>
   );
 }
