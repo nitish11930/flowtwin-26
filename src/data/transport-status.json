@@ -1,0 +1,29 @@
+{
+  "lastUpdated": "2026-07-09T00:20:00Z",
+  "services": [
+    {
+      "id": "transit-red-line",
+      "type": "Train",
+      "name": "Red Line Express",
+      "status": "Delayed",
+      "delayMinutes": 15,
+      "message": "Signal failure at downtown station. Expect delays up to 15 minutes."
+    },
+    {
+      "id": "transit-shuttle-north",
+      "type": "Shuttle",
+      "name": "North Parking Shuttle",
+      "status": "On Time",
+      "delayMinutes": 0,
+      "message": "Running normally every 5 minutes."
+    },
+    {
+      "id": "transit-uber-zone",
+      "type": "Rideshare",
+      "name": "South Rideshare Zone",
+      "status": "Surge",
+      "delayMinutes": 25,
+      "message": "High demand. Wait times up to 25 minutes. Surge pricing active."
+    }
+  ]
+}

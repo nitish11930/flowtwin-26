@@ -1,17 +1,23 @@
 {
-  "gateCongestion": {
-    "GATE_A": { "status": "high", "penalty": 30 },
-    "GATE_B": { "status": "low", "penalty": 5 }
+  "timestamp": "2026-07-09T00:20:00Z",
+  "congestion": {
+    "Gate A": { "level": "Low", "peoplePerMinute": 45, "estimatedWaitTimeMins": 5 },
+    "Gate B": { "level": "Moderate", "peoplePerMinute": 80, "estimatedWaitTimeMins": 12 },
+    "Gate C": { "level": "Severe", "peoplePerMinute": 150, "estimatedWaitTimeMins": 45 },
+    "Food Court North": { "level": "High", "peoplePerMinute": 120, "estimatedWaitTimeMins": 25 }
   },
-  "concourseCongestion": {
-    "CONCOURSE_1": { "status": "medium", "penalty": 15 }
-  },
-  "transitDelays": {
-    "TRANSIT_HUB": { "status": "delayed", "penalty": 20 }
-  },
-  "weatherCondition": {
-    "status": "clear",
-    "penalty": 0
-  },
-  "sustainabilityBonus": 10
+  "weatherAlerts": [
+    {
+      "type": "Lightning",
+      "severity": "Warning",
+      "message": "Lightning strikes detected within 5 miles. Open-air sections (300-level) must seek shelter.",
+      "active": false
+    },
+    {
+      "type": "Heat",
+      "severity": "Advisory",
+      "message": "High temperature expected. Please stay hydrated.",
+      "active": true
+    }
+  ]
 }

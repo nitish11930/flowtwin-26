@@ -1,8 +1,28 @@
 {
+  "sections": [
+    {
+      "id": "sec-101",
+      "name": "Section 101",
+      "coordinates": { "x": 120, "y": 80 },
+      "capacity": 500
+    },
+    {
+      "id": "sec-102",
+      "name": "Section 102",
+      "coordinates": { "x": 150, "y": 90 },
+      "capacity": 450
+    },
+    {
+      "id": "vip-1",
+      "name": "VIP Lounge North",
+      "coordinates": { "x": 100, "y": 200 },
+      "capacity": 50
+    }
+  ],
   "gates": {
-    "Gate A": { "status": "Normal", "crowdPenalty": 5 },
-    "Gate B": { "status": "Normal", "crowdPenalty": 5 },
-    "Gate C": { "status": "Congested", "crowdPenalty": 30 }
+    "Gate A": { "coordinates": { "x": 10, "y": 50 }, "status": "Normal", "crowdPenalty": 5 },
+    "Gate B": { "coordinates": { "x": 300, "y": 150 }, "status": "Normal", "crowdPenalty": 5 },
+    "Gate C": { "coordinates": { "x": 150, "y": 300 }, "status": "Congested", "crowdPenalty": 30 }
   },
   "transit": {
     "Train": { "status": "Delayed", "delayMinutes": 12, "transitPenalty": 12 },

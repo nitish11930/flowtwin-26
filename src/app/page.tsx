@@ -14,22 +14,31 @@ export default function Home() {
           </p>
         </div>
 
-        <div className="flex flex-col md:flex-row gap-8 w-full justify-center items-center">
+        <div className="flex flex-col md:flex-row gap-6 w-full justify-center items-stretch">
           {/* Fan View Button */}
-          <Link href="/fan" className="w-full md:w-1/2 max-w-md">
-            <button className="w-full group relative flex flex-col items-center justify-center p-12 bg-white border-2 border-blue-600 hover:bg-blue-50 rounded-3xl transition-all shadow-xl hover:shadow-2xl hover:-translate-y-2 overflow-hidden">
-              <Users className="h-20 w-20 text-blue-600 mb-6 group-hover:scale-110 transition-transform" />
-              <h2 className="text-3xl font-bold text-slate-900 mb-2">Fan Copilot</h2>
-              <p className="text-slate-600">Mobile-First & Accessible</p>
+          <Link href="/fan" className="w-full md:w-1/3 max-w-sm">
+            <button className="h-full w-full group relative flex flex-col items-center justify-center p-10 bg-white border-2 border-blue-600 hover:bg-blue-50 rounded-3xl transition-all shadow-xl hover:shadow-2xl hover:-translate-y-2 overflow-hidden">
+              <Users className="h-16 w-16 text-blue-600 mb-4 group-hover:scale-110 transition-transform" />
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Fan Copilot</h2>
+              <p className="text-slate-600 text-sm">Mobile-First & Accessible</p>
+            </button>
+          </Link>
+
+          {/* Volunteer View Button */}
+          <Link href="/volunteer" className="w-full md:w-1/3 max-w-sm">
+            <button className="h-full w-full group relative flex flex-col items-center justify-center p-10 bg-white border-2 border-amber-500 hover:bg-amber-50 rounded-3xl transition-all shadow-xl hover:shadow-2xl hover:-translate-y-2 overflow-hidden">
+              <Activity className="h-16 w-16 text-amber-500 mb-4 group-hover:scale-110 transition-transform" />
+              <h2 className="text-2xl font-bold text-slate-900 mb-2">Volunteer Hub</h2>
+              <p className="text-slate-600 text-sm">RAG Policies & Tasks</p>
             </button>
           </Link>
 
           {/* Operations View Button */}
-          <Link href="/ops" className="w-full md:w-1/2 max-w-md">
-            <button className="w-full group relative flex flex-col items-center justify-center p-12 bg-slate-900 border-2 border-slate-900 hover:bg-slate-800 rounded-3xl transition-all shadow-xl hover:shadow-2xl hover:-translate-y-2 overflow-hidden">
-              <Activity className="h-20 w-20 text-emerald-400 mb-6 group-hover:scale-110 transition-transform" />
-              <h2 className="text-3xl font-bold text-white mb-2">Ops Dashboard</h2>
-              <p className="text-slate-400">Desktop Command Center</p>
+          <Link href="/ops" className="w-full md:w-1/3 max-w-sm">
+            <button className="h-full w-full group relative flex flex-col items-center justify-center p-10 bg-slate-900 border-2 border-slate-900 hover:bg-slate-800 rounded-3xl transition-all shadow-xl hover:shadow-2xl hover:-translate-y-2 overflow-hidden">
+              <Activity className="h-16 w-16 text-emerald-400 mb-4 group-hover:scale-110 transition-transform" />
+              <h2 className="text-2xl font-bold text-white mb-2">Ops Dashboard</h2>
+              <p className="text-slate-400 text-sm">Desktop Command Center</p>
             </button>
           </Link>
         </div>

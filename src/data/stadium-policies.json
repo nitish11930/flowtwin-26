@@ -1,0 +1,36 @@
+{
+  "policies": [
+    {
+      "category": "Lost Child",
+      "protocol": "Code Amber",
+      "instructions": [
+        "Immediately notify the nearest usher or security guard.",
+        "Provide a detailed description of the child (age, clothing, last seen location).",
+        "Wait at the exact location where you lost sight of them.",
+        "Security will initiate a sector-wide lockdown until the child is located."
+      ],
+      "contactLocation": "Guest Services Desk at Section 112"
+    },
+    {
+      "category": "Medical Emergency",
+      "protocol": "Code Red",
+      "instructions": [
+        "Do not move the individual unless they are in immediate danger.",
+        "Alert an usher or use the FlowTwin app emergency button.",
+        "State the exact section, row, and seat number.",
+        "First aid response team targets a 3-minute arrival."
+      ],
+      "contactLocation": "First Aid stations at Sections 105, 215, 330"
+    },
+    {
+      "category": "Accessibility",
+      "protocol": "Access Assist",
+      "instructions": [
+        "All main gates (A, B) have dedicated accessible entry lanes.",
+        "Wheelchair escorts are available upon request at entry.",
+        "Accessible seating requires verified ticketing."
+      ],
+      "contactLocation": "ADA Assistance Kiosk at Gate A"
+    }
+  ]
+}

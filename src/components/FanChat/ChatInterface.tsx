@@ -36,25 +36,38 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
     const needsAccess = messageText.toLowerCase().includes('accessible') || messageText.toLowerCase().includes('wheelchair');
     
     try {
-      const response = await fetch('/api/chat', {
+      // Step 1: Get raw route recommendation
+      const routeResponse = await fetch('/api/route-recommendation', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: messageText, gateCSurgeActive, needsAccess })
+        body: JSON.stringify({ needsAccess, gateCSurgeActive })
       });
+      const routeData = await routeResponse.json();
       
-      const data = await response.json();
-      
-      if (data.routeData) {
-        const botMsg: Message = {
-          id: Date.now().toString(),
-          sender: 'bot',
-          text: isUpdate ? `Update: Live conditions have changed.\n\n${data.routeData.explanation}` : data.routeData.explanation,
-          routeData: data.routeData
-        };
-        setMessages(prev => [...prev, botMsg]);
-      } else {
-        throw new Error(data.error || "Unknown error");
+      if (!routeData.routeData) {
+        throw new Error(routeData.error || "No route found");
       }
+
+      // Step 2: Get natural language explanation from Fan Assistant
+      const aiResponse = await fetch('/api/fan-assistant', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ routeData: routeData.routeData, userMessage: messageText })
+      });
+      const aiData = await aiResponse.json();
+
+      const combinedRouteData = {
+        ...routeData.routeData,
+        explanation: aiData.explanation || ""
+      };
+
+      const botMsg: Message = {
+        id: Date.now().toString(),
+        sender: 'bot',
+        text: isUpdate ? `Update: Live conditions have changed.\n\n${combinedRouteData.explanation}` : combinedRouteData.explanation,
+        routeData: combinedRouteData
+      };
+      setMessages(prev => [...prev, botMsg]);
     } catch (err) {
       console.error(err);
       setMessages(prev => [...prev, {

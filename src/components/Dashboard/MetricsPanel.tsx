@@ -27,15 +27,17 @@ export default function MetricsPanel() {
           <div className="text-2xl font-bold text-white">5 <span className="text-sm text-slate-500 font-normal">min</span></div>
         </div>
 
-        <div className={`rounded-xl p-4 border flex flex-col justify-center transition-colors duration-500 ${state.gateCSurgeActive ? 'bg-red-950/40 border-red-500/50' : 'bg-slate-900 border-slate-700/50'}`}>
+        <button 
+          onClick={() => setSharedState({ gateCSurgeActive: !state.gateCSurgeActive })}
+          className={`text-left rounded-xl p-4 border flex flex-col justify-center transition-colors duration-500 hover:opacity-80 focus:outline-none focus:ring-2 focus:ring-slate-500 ${state.gateCSurgeActive ? 'bg-red-950/40 border-red-500/50' : 'bg-slate-900 border-slate-700/50 cursor-pointer'}`}>
           <div className={`text-sm flex items-center mb-1 ${state.gateCSurgeActive ? 'text-red-400 font-bold' : 'text-slate-400'}`}>
             {state.gateCSurgeActive ? <AlertCircle className="h-4 w-4 mr-1 animate-pulse" /> : <Users className="h-4 w-4 mr-1 text-emerald-400" />}
-            Gate C Wait
+            Gate C Wait (Toggle Surge)
           </div>
           <div className={`text-2xl font-bold ${state.gateCSurgeActive ? 'text-red-400' : 'text-white'}`}>
             {state.gateCSurgeActive ? '120+' : '10'} <span className="text-sm font-normal opacity-70">min</span>
           </div>
-        </div>
+        </button>
 
         <div className="bg-slate-900 rounded-xl p-4 border border-slate-700/50 flex flex-col justify-center">
           <div className="text-slate-400 text-sm flex items-center mb-1">

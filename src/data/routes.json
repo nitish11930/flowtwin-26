@@ -1,0 +1,38 @@
+[
+  {
+    "id": "path-A-101",
+    "name": "Main Concourse Route A",
+    "startPoint": "Gate A",
+    "endPoint": "Section 101",
+    "distanceMeters": 250,
+    "isAccessible": true,
+    "hasStairs": false,
+    "averageTimeMins": 4,
+    "transitId": "transit-red-line",
+    "sustainabilityBonus": 20
+  },
+  {
+    "id": "path-B-102",
+    "name": "North Ramp Route B",
+    "startPoint": "Gate B",
+    "endPoint": "Section 102",
+    "distanceMeters": 400,
+    "isAccessible": true,
+    "hasStairs": false,
+    "averageTimeMins": 7,
+    "transitId": "transit-shuttle-north",
+    "sustainabilityBonus": 30
+  },
+  {
+    "id": "path-C-vip",
+    "name": "Express Stairs C",
+    "startPoint": "Gate C",
+    "endPoint": "VIP Lounge North",
+    "distanceMeters": 150,
+    "isAccessible": false,
+    "hasStairs": true,
+    "averageTimeMins": 3,
+    "transitId": "transit-uber-zone",
+    "sustainabilityBonus": 0
+  }
+]
