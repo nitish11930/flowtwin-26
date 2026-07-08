@@ -1,0 +1,17 @@
+{
+  "gateCongestion": {
+    "GATE_A": { "status": "high", "penalty": 30 },
+    "GATE_B": { "status": "low", "penalty": 5 }
+  },
+  "concourseCongestion": {
+    "CONCOURSE_1": { "status": "medium", "penalty": 15 }
+  },
+  "transitDelays": {
+    "TRANSIT_HUB": { "status": "delayed", "penalty": 20 }
+  },
+  "weatherCondition": {
+    "status": "clear",
+    "penalty": 0
+  },
+  "sustainabilityBonus": 10
+}

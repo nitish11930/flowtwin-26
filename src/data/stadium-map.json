@@ -1,0 +1,43 @@
+{
+  "gates": {
+    "Gate A": { "status": "Normal", "crowdPenalty": 5 },
+    "Gate B": { "status": "Normal", "crowdPenalty": 5 },
+    "Gate C": { "status": "Congested", "crowdPenalty": 30 }
+  },
+  "transit": {
+    "Train": { "status": "Delayed", "delayMinutes": 12, "transitPenalty": 12 },
+    "Shuttle": { "status": "On time", "delayMinutes": 0, "transitPenalty": 0 }
+  },
+  "routes": [
+    {
+      "id": "route_1",
+      "name": "Via Train and Gate A",
+      "distance": 100,
+      "gate": "Gate A",
+      "transit": "Train",
+      "isAccessible": true,
+      "weatherPenalty": 0,
+      "sustainabilityBonus": 10
+    },
+    {
+      "id": "route_2",
+      "name": "Via Train and Gate C",
+      "distance": 80,
+      "gate": "Gate C",
+      "transit": "Train",
+      "isAccessible": true,
+      "weatherPenalty": 0,
+      "sustainabilityBonus": 10
+    },
+    {
+      "id": "route_3",
+      "name": "Via Shuttle and Gate B",
+      "distance": 150,
+      "gate": "Gate B",
+      "transit": "Shuttle",
+      "isAccessible": false,
+      "weatherPenalty": 0,
+      "sustainabilityBonus": 15
+    }
+  ]
+}
