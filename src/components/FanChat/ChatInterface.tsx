@@ -2,7 +2,9 @@
 import { useState, useEffect } from 'react';
 import { Send, User, Bot, Loader2 } from 'lucide-react';
 import SmartRouteCard from './SmartRouteCard';
+import AmenityCard from './AmenityCard';
 import { RouteScoreResult } from '@/lib/routingEngine';
+import type { AmenityRecommendation } from '@/lib/amenityEngine';
 
 type IncidentDraft = {
   type: string;
@@ -18,6 +20,7 @@ type Message = {
   sender: 'user' | 'bot';
   text: string;
   routeData?: RouteScoreResult;
+  amenityData?: AmenityRecommendation;
   intent?: string;
   actions?: string[];
   capturedDetails?: Record<string, string>;
@@ -25,6 +28,7 @@ type Message = {
   createIncidentSuggested?: boolean;
   incidentDraft?: IncidentDraft;
   incidentId?: string;
+  orderId?: string;
 };
 
 function getIncidentButtonLabel(intent?: string) {
@@ -78,6 +82,7 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
   ]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  const [orderingMessageId, setOrderingMessageId] = useState<string | null>(null);
   const [lastInput, setLastInput] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
 
@@ -101,15 +106,25 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
       });
       const aiData = await aiResponse.json();
 
-      const emergencyIntents = ['lost_child', 'medical', 'security', 'crowd_help'];
+      const directAssistantIntents = [
+        'lost_child',
+        'medical',
+        'security',
+        'crowd_help',
+        'food_search',
+        'drink_search',
+        'water_search',
+        'restroom_search',
+        'sponsor_search'
+      ];
       
-      if (emergencyIntents.includes(aiData.intent)) {
-        // Handle emergency
+      if (directAssistantIntents.includes(aiData.intent) || aiData.amenityData) {
         const botMsg: Message = {
           id: Date.now().toString(),
           sender: 'bot',
           text: aiData.answer,
           intent: aiData.intent,
+          amenityData: aiData.amenityData,
           actions: aiData.actions,
           capturedDetails: aiData.capturedDetails,
           requiredDetails: aiData.requiredDetails,
@@ -152,6 +167,45 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
       }]);
     } finally {
       setIsTyping(false);
+    }
+  };
+
+  const handleReservePickup = async (messageId: string) => {
+    const targetMessage = messages.find(msg => msg.id === messageId);
+    const amenity = targetMessage?.amenityData?.amenity;
+    if (!amenity) return;
+
+    setOrderingMessageId(messageId);
+    try {
+      const response = await fetch('/api/food-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amenityId: amenity.id,
+          amenityName: amenity.name,
+          pickupLocation: amenity.location,
+          items: amenity.items.slice(0, 2),
+          pickupEtaMins: Math.max(8, amenity.queueTimeMins)
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Could not reserve pickup');
+      }
+
+      const order = await response.json();
+      setMessages(prev => prev.map(msg => (
+        msg.id === messageId ? { ...msg, orderId: order.id } : msg
+      )));
+    } catch (err) {
+      console.error(err);
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        sender: 'bot',
+        text: 'I could not reserve pickup right now. You can still go to the stall using the route shown.'
+      }]);
+    } finally {
+      setOrderingMessageId(null);
     }
   };
 
@@ -269,6 +323,14 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
                       </>
                     )}
                   </div>
+                )}
+                {msg.amenityData && (
+                  <AmenityCard
+                    amenityData={msg.amenityData}
+                    orderId={msg.orderId}
+                    isOrdering={orderingMessageId === msg.id}
+                    onReserve={() => handleReservePickup(msg.id)}
+                  />
                 )}
                 {msg.routeData && <SmartRouteCard routeData={msg.routeData} />}
               </div>

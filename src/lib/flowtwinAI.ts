@@ -2,6 +2,7 @@ import { GoogleGenAI } from '@google/genai';
 import policies from '../data/stadium-policies.json';
 import liveCrowd from '../data/live-crowd-data.json';
 import { calculateBestRoute } from './routingEngine';
+import { buildAmenityAnswer, findBestAmenity, parseAmenitySearchContext } from './amenityEngine';
 
 type AIMode = 'fan_navigation' | 'volunteer_policy' | 'operations_command' | 'announcement' | 'incident_support';
 
@@ -230,6 +231,37 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
   const lowerMsg = message.toLowerCase();
 
   if (mode === 'fan_navigation') {
+    const amenityContext = parseAmenitySearchContext(message);
+    if (amenityContext) {
+      const recommendation = findBestAmenity(amenityContext);
+      if (recommendation) {
+        const category = recommendation.amenity.category;
+        const intent = category === 'restroom'
+          ? 'restroom_search'
+          : category === 'water'
+            ? 'water_search'
+            : category === 'sponsor'
+              ? 'sponsor_search'
+              : category === 'drink'
+                ? 'drink_search'
+                : 'food_search';
+
+        return {
+          intent,
+          answer: buildAmenityAnswer(recommendation, amenityContext),
+          amenityData: recommendation,
+          actions: [
+            'Navigate with crowd-aware route',
+            recommendation.bookingAvailable ? 'Reserve pickup' : 'Follow signs to location',
+            recommendation.amenity.accessible ? 'Use accessible path' : 'Ask a volunteer before moving'
+          ],
+          crowdAware: true,
+          accessibility: Boolean(amenityContext.requiresAccessibility || recommendation.amenity.accessible),
+          language: amenityContext.language
+        };
+      }
+    }
+
     const wantsHindi = lowerMsg.includes('hindi') || lowerMsg.includes('only speak hindi') || lowerMsg.includes('speak hindi');
     const wantsAccessibleRoute =
       lowerMsg.includes('wheelchair') ||

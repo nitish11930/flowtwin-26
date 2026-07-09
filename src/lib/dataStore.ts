@@ -105,8 +105,28 @@ export type Task = {
   isComplete: boolean;
 };
 
+export type FoodOrder = {
+  id: string;
+  amenityId: string;
+  amenityName: string;
+  pickupLocation: string;
+  items: string[];
+  status: 'reserved' | 'ready' | 'picked_up';
+  pickupEtaMins: number;
+  createdAt: string;
+};
+
+export type FoodOrderDraft = {
+  amenityId: string;
+  amenityName: string;
+  pickupLocation: string;
+  items: string[];
+  pickupEtaMins?: number;
+};
+
 export class DataStore {
   incidents: Incident[] = [];
+  orders: FoodOrder[] = [];
   tasks: Task[] = [
     {
       id: 't1',
@@ -125,6 +145,25 @@ export class DataStore {
       isComplete: true
     }
   ];
+
+  createFoodOrder(order: FoodOrderDraft): FoodOrder {
+    const newOrder: FoodOrder = {
+      id: `ord-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
+      amenityId: order.amenityId,
+      amenityName: order.amenityName,
+      pickupLocation: order.pickupLocation,
+      items: order.items,
+      status: 'reserved',
+      pickupEtaMins: order.pickupEtaMins ?? 10,
+      createdAt: new Date().toISOString()
+    };
+    this.orders.unshift(newOrder);
+    return newOrder;
+  }
+
+  getFoodOrders(): FoodOrder[] {
+    return this.orders;
+  }
 
   addIncident(incident: IncidentDraft): IncidentWriteResult {
     const duplicate = this.findOpenDuplicate(incident);
@@ -346,6 +385,7 @@ if (existingStore && !(existingStore instanceof DataStore)) {
   const previousStore = existingStore as Partial<DataStore>;
   store.incidents = Array.isArray(previousStore.incidents) ? previousStore.incidents : [];
   store.tasks = Array.isArray(previousStore.tasks) ? previousStore.tasks : store.tasks;
+  store.orders = Array.isArray(previousStore.orders) ? previousStore.orders : [];
 }
 
 if (process.env.NODE_ENV !== 'production') globalForStore.store = store;

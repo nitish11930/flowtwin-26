@@ -152,6 +152,60 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
+  test('fan can find vegetarian food near Section 215 with pickup option', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('fan_navigation', 'Where is the nearest vegetarian food stall near Section 215?');
+
+      expect(res.intent).toBe('food_search');
+      expect(res.amenityData.amenity.name).toBe('FIFA Fresh Veg Kitchen');
+      expect(res.amenityData.bookingAvailable).toBe(true);
+      expect(res.answer).toContain('vegetarian');
+      expect(res.answer).toContain('reserve pickup');
+    });
+  });
+
+  test('fan can find water near Section 215', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('fan_navigation', 'I need water near Section 215.');
+
+      expect(res.intent).toBe('water_search');
+      expect(res.amenityData.amenity.name).toBe('Water Refill Station W2');
+      expect(res.amenityData.amenity.queueTimeMins).toBe(2);
+    });
+  });
+
+  test('fan can find low-crowd restroom', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('fan_navigation', 'Where is the nearest bathroom with less crowd near Section 215?');
+
+      expect(res.intent).toBe('restroom_search');
+      expect(res.amenityData.amenity.name).toBe('Accessible Restroom R-215');
+      expect(res.amenityData.amenity.crowdLevel).toBe('Low');
+      expect(res.answer.toLowerCase()).toContain('low');
+    });
+  });
+
+  test('fan can find halal food while avoiding Gate C', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('fan_navigation', 'Find halal food and route me there avoiding Gate C.');
+
+      expect(res.intent).toBe('food_search');
+      expect(res.amenityData.amenity.name).toBe('Halal Grill Express');
+      expect(res.crowdAware).toBe(true);
+      expect(res.answer).toContain('Halal');
+    });
+  });
+
+  test('fan can find Coca-Cola sponsor stall', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('fan_navigation', 'I want Coca-Cola sponsor stall near Gate A.');
+
+      expect(res.intent).toBe('sponsor_search');
+      expect(res.amenityData.amenity.name).toBe('Coca-Cola Fan Zone');
+      expect(res.amenityData.amenity.sponsor).toBe('Coca-Cola');
+    });
+  });
+
   test('Policy Assistant uses lost child incident context for next-step actions', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse(

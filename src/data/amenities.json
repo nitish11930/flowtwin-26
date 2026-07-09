@@ -1,0 +1,222 @@
+[
+  {
+    "id": "food-veg-215",
+    "name": "FIFA Fresh Veg Kitchen",
+    "category": "food",
+    "location": "Concourse West near Section 214",
+    "nearestSection": "Section 215",
+    "nearestGate": "Gate A",
+    "items": ["vegetarian bowls", "vegan wraps", "fruit cups", "water"],
+    "dietary": ["vegetarian", "vegan"],
+    "sponsor": null,
+    "queueTimeMins": 6,
+    "crowdLevel": "Low",
+    "accessible": true,
+    "acceptsPreOrder": true,
+    "distanceByOrigin": {
+      "Section 215": 70,
+      "Gate A": 210,
+      "Gate C": 560,
+      "Section 102": 430,
+      "Section 105": 380
+    }
+  },
+  {
+    "id": "food-halal-221",
+    "name": "Halal Grill Express",
+    "category": "food",
+    "location": "Concourse West near Section 221",
+    "nearestSection": "Section 221",
+    "nearestGate": "Gate B",
+    "items": ["halal chicken rice", "falafel wrap", "mint lemonade"],
+    "dietary": ["halal", "vegetarian"],
+    "sponsor": null,
+    "queueTimeMins": 12,
+    "crowdLevel": "Moderate",
+    "accessible": true,
+    "acceptsPreOrder": true,
+    "distanceByOrigin": {
+      "Section 215": 130,
+      "Gate A": 340,
+      "Gate C": 610,
+      "Section 102": 520,
+      "Section 105": 470
+    }
+  },
+  {
+    "id": "food-global-north",
+    "name": "Global Snacks Hub",
+    "category": "food",
+    "location": "Food Court North",
+    "nearestSection": "Section 110",
+    "nearestGate": "Gate C",
+    "items": ["nachos", "hot dogs", "soda", "fries"],
+    "dietary": ["snacks"],
+    "sponsor": null,
+    "queueTimeMins": 25,
+    "crowdLevel": "High",
+    "accessible": true,
+    "acceptsPreOrder": false,
+    "distanceByOrigin": {
+      "Section 215": 470,
+      "Gate A": 520,
+      "Gate C": 110,
+      "Section 102": 210,
+      "Section 105": 180
+    }
+  },
+  {
+    "id": "drink-coke-216",
+    "name": "Coca-Cola Hydration Bar",
+    "category": "drink",
+    "location": "Concourse West near Section 216",
+    "nearestSection": "Section 216",
+    "nearestGate": "Gate A",
+    "items": ["Coca-Cola", "water", "sports drink", "zero sugar soda"],
+    "dietary": ["drinks"],
+    "sponsor": "Coca-Cola",
+    "queueTimeMins": 5,
+    "crowdLevel": "Low",
+    "accessible": true,
+    "acceptsPreOrder": true,
+    "distanceByOrigin": {
+      "Section 215": 60,
+      "Gate A": 220,
+      "Gate C": 570,
+      "Section 102": 430,
+      "Section 105": 390
+    }
+  },
+  {
+    "id": "water-215",
+    "name": "Water Refill Station W2",
+    "category": "water",
+    "location": "Section 215 entry tunnel",
+    "nearestSection": "Section 215",
+    "nearestGate": "Gate A",
+    "items": ["free water refill"],
+    "dietary": ["water"],
+    "sponsor": null,
+    "queueTimeMins": 2,
+    "crowdLevel": "Low",
+    "accessible": true,
+    "acceptsPreOrder": false,
+    "distanceByOrigin": {
+      "Section 215": 30,
+      "Gate A": 180,
+      "Gate C": 590,
+      "Section 102": 450,
+      "Section 105": 410
+    }
+  },
+  {
+    "id": "restroom-accessible-215",
+    "name": "Accessible Restroom R-215",
+    "category": "restroom",
+    "location": "Behind Section 215",
+    "nearestSection": "Section 215",
+    "nearestGate": "Gate A",
+    "items": ["accessible restroom", "family restroom", "baby changing"],
+    "dietary": [],
+    "sponsor": null,
+    "queueTimeMins": 4,
+    "crowdLevel": "Low",
+    "accessible": true,
+    "acceptsPreOrder": false,
+    "distanceByOrigin": {
+      "Section 215": 45,
+      "Gate A": 190,
+      "Gate C": 600,
+      "Section 102": 460,
+      "Section 105": 420
+    }
+  },
+  {
+    "id": "restroom-c-concourse",
+    "name": "Gate C Concourse Restroom",
+    "category": "restroom",
+    "location": "Gate C lower concourse",
+    "nearestSection": "Section 103",
+    "nearestGate": "Gate C",
+    "items": ["standard restroom"],
+    "dietary": [],
+    "sponsor": null,
+    "queueTimeMins": 18,
+    "crowdLevel": "Severe",
+    "accessible": false,
+    "acceptsPreOrder": false,
+    "distanceByOrigin": {
+      "Section 215": 540,
+      "Gate A": 620,
+      "Gate C": 70,
+      "Section 102": 130,
+      "Section 105": 160
+    }
+  },
+  {
+    "id": "sponsor-coke-gate-a",
+    "name": "Coca-Cola Fan Zone",
+    "category": "sponsor",
+    "location": "Gate A plaza",
+    "nearestSection": "Section 101",
+    "nearestGate": "Gate A",
+    "items": ["photo booth", "sponsor games", "drink coupons"],
+    "dietary": [],
+    "sponsor": "Coca-Cola",
+    "queueTimeMins": 8,
+    "crowdLevel": "Moderate",
+    "accessible": true,
+    "acceptsPreOrder": false,
+    "distanceByOrigin": {
+      "Section 215": 230,
+      "Gate A": 40,
+      "Gate C": 650,
+      "Section 102": 210,
+      "Section 105": 240
+    }
+  },
+  {
+    "id": "sponsor-adidas-110",
+    "name": "Adidas Fan Gear Kiosk",
+    "category": "sponsor",
+    "location": "Section 110 concourse",
+    "nearestSection": "Section 110",
+    "nearestGate": "Gate B",
+    "items": ["team scarves", "jerseys", "matchday caps"],
+    "dietary": [],
+    "sponsor": "Adidas",
+    "queueTimeMins": 10,
+    "crowdLevel": "Moderate",
+    "accessible": true,
+    "acceptsPreOrder": false,
+    "distanceByOrigin": {
+      "Section 215": 390,
+      "Gate A": 360,
+      "Gate C": 240,
+      "Section 102": 190,
+      "Section 105": 120
+    }
+  },
+  {
+    "id": "sponsor-fifa-store-101",
+    "name": "FIFA Store Express",
+    "category": "sponsor",
+    "location": "Section 101 main concourse",
+    "nearestSection": "Section 101",
+    "nearestGate": "Gate A",
+    "items": ["official ball", "programs", "pins", "team flags"],
+    "dietary": [],
+    "sponsor": "FIFA Store",
+    "queueTimeMins": 7,
+    "crowdLevel": "Low",
+    "accessible": true,
+    "acceptsPreOrder": false,
+    "distanceByOrigin": {
+      "Section 215": 330,
+      "Gate A": 120,
+      "Gate C": 520,
+      "Section 102": 90,
+      "Section 105": 130
+    }
+  }
+]

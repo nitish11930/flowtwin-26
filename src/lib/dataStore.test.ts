@@ -119,4 +119,20 @@ describe('DataStore incident action workflow', () => {
       expect.arrayContaining(['Medical team notified', 'First-aid dispatch started', 'Response in progress'])
     );
   });
+
+  test('Creates mock food pickup order for fan amenity reservations', () => {
+    const store = new DataStore();
+    const order = store.createFoodOrder({
+      amenityId: 'food-veg-215',
+      amenityName: 'FIFA Fresh Veg Kitchen',
+      pickupLocation: 'Concourse West near Section 214',
+      items: ['vegetarian bowls', 'water'],
+      pickupEtaMins: 8
+    });
+
+    expect(order.id).toContain('ord-');
+    expect(order.status).toBe('reserved');
+    expect(order.pickupEtaMins).toBe(8);
+    expect(store.getFoodOrders()).toHaveLength(1);
+  });
 });
