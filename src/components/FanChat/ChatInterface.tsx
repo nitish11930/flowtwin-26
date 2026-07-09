@@ -115,7 +115,9 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
         'drink_search',
         'water_search',
         'restroom_search',
-        'sponsor_search'
+        'sponsor_search',
+        'acknowledgement',
+        'general_help'
       ];
       
       if (directAssistantIntents.includes(aiData.intent) || aiData.amenityData) {

@@ -51,7 +51,8 @@ describe('Shared FlowTwin AI Service', () => {
   test('fallback works without API key', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse('announcement', 'Welcome to the stadium');
-      expect(res.spanish).toContain('[ES]');
+      expect(res.spanish).toContain('Aviso del estadio');
+      expect(res.spanish).not.toContain('[ES]');
     });
   });
 
@@ -206,6 +207,18 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
+  test('fan acknowledgement does not trigger navigation', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('fan_navigation', 'great');
+
+      expect(res.intent).toBe('acknowledgement');
+      expect(res.createIncidentSuggested).toBe(false);
+      expect(res.answer).toContain('Glad it helped');
+      expect(res.answer.toLowerCase()).not.toContain('smart route');
+      expect(res.answer.toLowerCase()).not.toContain('routing engine');
+    });
+  });
+
   test('Policy Assistant uses lost child incident context for next-step actions', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse(
@@ -345,6 +358,41 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
+  test('volunteer crowd quick action gives operational guidance', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('volunteer_policy', 'Crowd');
+
+      expect(res.intent).toBe('crowd_policy');
+      expect(res.severity).toBe('high');
+      expect(res.answer).toContain('Gate C');
+      expect(res.checklist).toContain('Keep accessible and emergency lanes clear');
+      expect(res.recommendedContact).toContain('Crowd Lead');
+    });
+  });
+
+  test('volunteer accessibility quick action gives ADA guidance', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('volunteer_policy', 'Accessibility');
+
+      expect(res.intent).toBe('accessibility_policy');
+      expect(res.answer).toContain('step-free');
+      expect(res.answer).toContain('ADA Assistance');
+      expect(res.recommendedContact).toContain('Gate A');
+    });
+  });
+
+  test('volunteer directions and translate quick actions are useful', async () => {
+    await withNoKey(async () => {
+      const directions = await generateAiResponse('volunteer_policy', 'Directions');
+      const translate = await generateAiResponse('volunteer_policy', 'Translate');
+
+      expect(directions.intent).toBe('directions_policy');
+      expect(directions.answer).toContain('current location');
+      expect(translate.intent).toBe('translation_policy');
+      expect(translate.answer).toContain('never repeat private');
+    });
+  });
+
   test('ops Gate C surge recommends dispatch reroute and announcements', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse('operations_command', 'Gate C is surging and Section 102 has two incidents. What should Ops do now?');
@@ -393,6 +441,20 @@ describe('Shared FlowTwin AI Service', () => {
       expect(res.spanish).toContain('Puerta C');
       expect(res.hindi).toContain('गेट C');
       expect(res.english).not.toContain('private');
+    });
+  });
+
+  test('announcement creates real transit delay translations', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('announcement', 'train delayed by 15 minutes');
+
+      expect(res.english).toContain('15 minutes');
+      expect(res.spanish).toContain('15 minutos');
+      expect(res.french).toContain('15 minutes');
+      expect(res.portuguese).toContain('15 minutos');
+      expect(res.hindi).toContain('15');
+      expect(res.spanish).not.toContain('[ES]');
+      expect(res.hindi).not.toContain('[HI]');
     });
   });
 });

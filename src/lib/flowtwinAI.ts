@@ -231,6 +231,14 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
   const lowerMsg = message.toLowerCase();
 
   if (mode === 'fan_navigation') {
+    if (isAcknowledgementOnly(lowerMsg)) {
+      return {
+        intent: 'acknowledgement',
+        answer: 'Glad it helped. I can still help with food, water, restrooms, your seat, accessibility support, crowd-safe routes, or finding stadium staff.',
+        createIncidentSuggested: false
+      };
+    }
+
     const amenityContext = parseAmenitySearchContext(message);
     if (amenityContext) {
       const recommendation = findBestAmenity(amenityContext);
@@ -307,6 +315,82 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
   }
 
   if (mode === 'volunteer_policy') {
+    const quickAction = normalizeQuickAction(message);
+
+    if (quickAction === 'crowd' || lowerMsg.includes('crowd') || lowerMsg.includes('congestion') || lowerMsg.includes('surge')) {
+      return {
+        intent: 'crowd_policy',
+        severity: 'high',
+        answer: 'Crowd support mode. Keep exits and accessible lanes clear, redirect fans away from Gate C pressure toward Gate A or Gate B, and report any stopped flow or pushing to Ops immediately.',
+        checklist: [
+          'Stand before the bottleneck, not inside it',
+          'Redirect fans to Gate A or Gate B',
+          'Keep accessible and emergency lanes clear',
+          'Escalate pushing, blocked exits, or crowd crush risk to Ops'
+        ],
+        actions: [
+          'Notify Ops Dashboard of the pressure point',
+          'Ask nearby volunteers to form a visible wayfinding line',
+          'Use short multilingual directions instead of long explanations'
+        ],
+        recommendedContact: 'Ops Dashboard / Crowd Lead',
+        createIncidentSuggested: false
+      };
+    }
+
+    if (quickAction === 'accessibility' || lowerMsg.includes('accessibility') || lowerMsg.includes('accessible') || lowerMsg.includes('wheelchair')) {
+      return {
+        intent: 'accessibility_policy',
+        severity: 'medium',
+        answer: 'Accessibility support. Ask the fan for their destination, use step-free routes only, avoid Gate C if it is crowded, and connect them with ADA Assistance at Gate A when they need escort or seating support.',
+        checklist: [
+          'Ask destination and mobility need',
+          'Use ramps, elevators, and step-free concourses',
+          'Avoid stairs and severe crowd zones',
+          'Keep accessible lanes open'
+        ],
+        actions: [
+          'Guide the fan toward Gate A ADA Assistance if support is needed',
+          'Offer a quieter route if the fan reports sensory or mobility needs',
+          'Do not separate the fan from their group unless they ask'
+        ],
+        recommendedContact: 'ADA Assistance Kiosk at Gate A',
+        createIncidentSuggested: false
+      };
+    }
+
+    if (quickAction === 'directions' || lowerMsg.includes('direction') || lowerMsg.includes('bathroom') || lowerMsg.includes('restroom') || lowerMsg.includes('stall')) {
+      return {
+        intent: 'directions_policy',
+        severity: 'low',
+        answer: 'Directions support. Ask for the fan’s current location and destination, then give one clear route using landmarks such as gates, sections, restrooms, food stalls, sponsor zones, or elevators. If Gate C is crowded, route around it.',
+        checklist: [
+          'Confirm current location',
+          'Confirm destination',
+          'Mention accessible option if needed',
+          'Avoid known crowd pressure zones'
+        ],
+        recommendedContact: 'Nearest wayfinding volunteer or Ops Dashboard',
+        createIncidentSuggested: false
+      };
+    }
+
+    if (quickAction === 'translate' || lowerMsg.includes('translate') || lowerMsg.includes('language')) {
+      return {
+        intent: 'translation_policy',
+        severity: 'low',
+        answer: 'Translation support. Ask the fan to speak or type one short request, translate only the operational need, and never repeat private phone numbers, child details, or medical information over public channels.',
+        checklist: [
+          'Use short sentences',
+          'Confirm the fan’s language',
+          'Translate the action needed, not private details',
+          'Bring a bilingual volunteer for emergencies'
+        ],
+        recommendedContact: 'Nearest bilingual volunteer or Guest Services',
+        createIncidentSuggested: false
+      };
+    }
+
     if (
       lowerMsg.includes('announce') &&
       (lowerMsg.includes('guardian phone') || lowerMsg.includes('phone number') || lowerMsg.includes('contact'))
@@ -466,7 +550,14 @@ function summarizeMissingIncidentDetails(openIncidents: any[]) {
 
 function buildPublicAnnouncement(message: string) {
   const safeMessage = message.replace(/\b\d{7,15}\b/g, '[private contact removed]');
-  const isGateCCongestion = safeMessage.toLowerCase().includes('gate c') || safeMessage.toLowerCase().includes('congestion');
+  const lowerSafeMessage = safeMessage.toLowerCase();
+  const isGateCCongestion = lowerSafeMessage.includes('gate c') || lowerSafeMessage.includes('congestion');
+  const isTransitDelay =
+    lowerSafeMessage.includes('train') ||
+    lowerSafeMessage.includes('metro') ||
+    lowerSafeMessage.includes('rail') ||
+    lowerSafeMessage.includes('transit');
+  const delayMinutes = safeMessage.match(/\b(\d{1,3})\s*(?:min|mins|minute|minutes)\b/i)?.[1] ?? '15';
 
   if (isGateCCongestion) {
     return {
@@ -479,14 +570,48 @@ function buildPublicAnnouncement(message: string) {
     };
   }
 
+  if (isTransitDelay || lowerSafeMessage.includes('delayed') || lowerSafeMessage.includes('delay')) {
+    return {
+      english: `Transit update: trains are delayed by ${delayMinutes} minutes. Please allow extra travel time, follow staff directions, and use the least crowded available gate.`,
+      spanish: `Actualizacion de transporte: los trenes tienen una demora de ${delayMinutes} minutos. Prevea mas tiempo, siga las indicaciones del personal y use la puerta disponible con menos fila.`,
+      french: `Information transport: les trains ont ${delayMinutes} minutes de retard. Prevoyez plus de temps, suivez les consignes du personnel et utilisez la porte disponible la moins chargee.`,
+      portuguese: `Atualizacao de transporte: os trens estao atrasados ${delayMinutes} minutos. Reserve mais tempo, siga a orientacao da equipe e use o portao disponivel menos cheio.`,
+      arabic: `Transit update: trains are delayed by ${delayMinutes} minutes. Please allow extra travel time and follow staff directions.`,
+      hindi: `यातायात सूचना: ट्रेनें ${delayMinutes} मिनट देरी से चल रही हैं। कृपया अतिरिक्त समय रखें, स्टाफ के निर्देशों का पालन करें और कम भीड़ वाले उपलब्ध गेट का उपयोग करें।`
+    };
+  }
+
   return {
-    english: safeMessage,
-    spanish: `[ES] ${safeMessage}`,
-    french: `[FR] ${safeMessage}`,
-    portuguese: `[PT] ${safeMessage}`,
-    arabic: `[AR] ${safeMessage}`,
-    hindi: `[HI] ${safeMessage}`
+    english: `Stadium update: ${safeMessage}`,
+    spanish: `Aviso del estadio: ${safeMessage}`,
+    french: `Annonce du stade: ${safeMessage}`,
+    portuguese: `Aviso do estadio: ${safeMessage}`,
+    arabic: `Stadium update: ${safeMessage}`,
+    hindi: `स्टेडियम सूचना: ${safeMessage}`
   };
+}
+
+function normalizeQuickAction(message: string) {
+  return message.trim().toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ');
+}
+
+function isAcknowledgementOnly(lowerMsg: string) {
+  const normalized = lowerMsg.trim().replace(/[.!?]+$/g, '').replace(/\s+/g, ' ');
+  return [
+    'great',
+    'thanks',
+    'thank you',
+    'thank u',
+    'ok',
+    'okay',
+    'cool',
+    'nice',
+    'got it',
+    'good',
+    'awesome',
+    'perfect',
+    'done'
+  ].includes(normalized);
 }
 
 function titleCase(value: string) {
