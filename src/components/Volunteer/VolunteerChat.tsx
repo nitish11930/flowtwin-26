@@ -16,15 +16,30 @@ type Message = {
 };
 
 const QUICK_ACTIONS = ['Lost Child', 'Medical', 'Accessibility', 'Crowd', 'Directions', 'Translate'];
+const VOLUNTEER_CHAT_STORAGE_KEY = 'flowtwin-volunteer-chat-history';
+const VOLUNTEER_INITIAL_MESSAGES: Message[] = [
+  {
+    id: '1',
+    sender: 'bot',
+    text: "Hi! I'm the Volunteer Policy Assistant. Ask me any protocol questions (e.g. Lost Child, Medical).",
+  }
+];
+
+function loadStoredMessages() {
+  if (typeof window === 'undefined') return VOLUNTEER_INITIAL_MESSAGES;
+
+  try {
+    const stored = window.localStorage.getItem(VOLUNTEER_CHAT_STORAGE_KEY);
+    if (!stored) return VOLUNTEER_INITIAL_MESSAGES;
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : VOLUNTEER_INITIAL_MESSAGES;
+  } catch {
+    return VOLUNTEER_INITIAL_MESSAGES;
+  }
+}
 
 export default function VolunteerChat() {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      sender: 'bot',
-      text: "Hi! I'm the Volunteer Policy Assistant. Ask me any protocol questions (e.g. Lost Child, Medical).",
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>(loadStoredMessages);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [incidentNotice, setIncidentNotice] = useState<{ id: string; deduped?: boolean } | null>(null);
@@ -35,12 +50,17 @@ export default function VolunteerChat() {
     endOfMessagesRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isTyping]);
 
+  useEffect(() => {
+    window.localStorage.setItem(VOLUNTEER_CHAT_STORAGE_KEY, JSON.stringify(messages));
+  }, [messages]);
+
   const handleSend = async (overrideText?: string) => {
     const userText = overrideText || input;
     if (!userText.trim()) return;
     
     const newMsg: Message = { id: Date.now().toString(), sender: 'user', text: userText };
-    setMessages(prev => [...prev, newMsg]);
+    const nextMessages = [...messages, newMsg];
+    setMessages(nextMessages);
     setInput('');
     setIsTyping(true);
     setIncidentNotice(null);
@@ -49,7 +69,13 @@ export default function VolunteerChat() {
       const response = await fetch('/api/volunteer/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: userText, volunteerId: 'vol-123', sector: 'Sector 102', language: 'en' })
+        body: JSON.stringify({
+          message: userText,
+          messages: nextMessages,
+          volunteerId: 'vol-123',
+          sector: 'Sector 102',
+          language: 'en'
+        })
       });
       const data = await response.json();
       

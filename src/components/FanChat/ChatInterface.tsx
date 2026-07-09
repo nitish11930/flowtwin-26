@@ -72,14 +72,30 @@ function buildFallbackIncidentDraft(message: Message): IncidentDraft {
   };
 }
 
+const FAN_CHAT_STORAGE_KEY = 'flowtwin-fan-chat-history';
+const FAN_INITIAL_MESSAGES: Message[] = [
+  {
+    id: '1',
+    sender: 'bot',
+    text: "Hi! I'm your FlowTwin Copilot. Where are you starting from, where are you heading, and do you need accessible routing?",
+  }
+];
+
+function loadStoredMessages() {
+  if (typeof window === 'undefined') return FAN_INITIAL_MESSAGES;
+
+  try {
+    const stored = window.localStorage.getItem(FAN_CHAT_STORAGE_KEY);
+    if (!stored) return FAN_INITIAL_MESSAGES;
+    const parsed = JSON.parse(stored);
+    return Array.isArray(parsed) && parsed.length > 0 ? parsed : FAN_INITIAL_MESSAGES;
+  } catch {
+    return FAN_INITIAL_MESSAGES;
+  }
+}
+
 export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: boolean }) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      sender: 'bot',
-      text: "Hi! I'm your FlowTwin Copilot. Where are you starting from, where are you heading, and do you need accessible routing?",
-    }
-  ]);
+  const [messages, setMessages] = useState<Message[]>(loadStoredMessages);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [orderingMessageId, setOrderingMessageId] = useState<string | null>(null);
@@ -87,13 +103,17 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
   const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
+    window.localStorage.setItem(FAN_CHAT_STORAGE_KEY, JSON.stringify(messages));
+  }, [messages]);
+
+  useEffect(() => {
     if (hasSearched) {
-      callChatApi(lastInput, true);
+      callChatApi(lastInput, true, messages);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gateCSurgeActive]);
 
-  const callChatApi = async (messageText: string, isUpdate = false) => {
+  const callChatApi = async (messageText: string, isUpdate = false, chatHistory: Message[] = messages) => {
     setIsTyping(true);
     const needsAccess = messageText.toLowerCase().includes('accessible') || messageText.toLowerCase().includes('wheelchair');
     
@@ -102,7 +122,7 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
       const aiResponse = await fetch('/api/fan-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userMessage: messageText })
+        body: JSON.stringify({ userMessage: messageText, messages: chatHistory })
       });
       const aiData = await aiResponse.json();
 
@@ -215,13 +235,14 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
     if (!input.trim()) return;
     
     const newMsg: Message = { id: Date.now().toString(), sender: 'user', text: input };
-    setMessages(prev => [...prev, newMsg]);
+    const nextMessages = [...messages, newMsg];
+    setMessages(nextMessages);
     setLastInput(input);
     setHasSearched(true);
     const currentInput = input;
     setInput('');
     
-    callChatApi(currentInput, false);
+    callChatApi(currentInput, false, nextMessages);
   };
 
   const handleCreateIncident = async (messageId: string) => {

@@ -219,6 +219,39 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
+  test('fan persistent history keeps unresolved lost child in Code Amber flow', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse(
+        'fan_navigation',
+        'Where is the nearest food stall?',
+        {
+          chatHistory: [
+            {
+              sender: 'bot',
+              text: "Hi! I'm your FlowTwin Copilot. Where are you starting from, where are you heading, and do you need accessible routing?"
+            },
+            {
+              sender: 'user',
+              text: 'My child Sania is missing. She is 12, wearing a dark blue shirt, last seen at Gate C, contact 9911446670.'
+            },
+            {
+              sender: 'bot',
+              text: 'Code Amber incident draft ready. Stay at Gate C and notify staff now.',
+              intent: 'lost_child'
+            }
+          ]
+        }
+      );
+
+      expect(res.intent).toBe('lost_child');
+      expect(res.createIncidentSuggested).toBe(true);
+      expect(res.answer).toContain('Code Amber');
+      expect(res.answer.toLowerCase()).not.toContain('nearest food');
+      expect(res.answer.toLowerCase()).not.toContain('route');
+      expect(res.memoryState.type).toBe('lost_child');
+    });
+  });
+
   test('Policy Assistant uses lost child incident context for next-step actions', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse(
@@ -367,6 +400,63 @@ describe('Shared FlowTwin AI Service', () => {
       expect(res.answer).toContain('Gate C');
       expect(res.checklist).toContain('Keep accessible and emergency lanes clear');
       expect(res.recommendedContact).toContain('Crowd Lead');
+    });
+  });
+
+  test('volunteer welcome text does not falsely activate emergency memory', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse(
+        'volunteer_policy',
+        'Crowd',
+        {
+          chatHistory: [
+            {
+              sender: 'bot',
+              text: "Hi! I'm the Volunteer Policy Assistant. Ask me any protocol questions (e.g. Lost Child, Medical)."
+            },
+            {
+              sender: 'user',
+              text: 'Crowd'
+            }
+          ]
+        }
+      );
+
+      expect(res.intent).toBe('crowd_policy');
+      expect(res.answer).toContain('Crowd support mode');
+      expect(res.answer).not.toContain('Code Red');
+      expect(res.answer).not.toContain('Code Amber');
+    });
+  });
+
+  test('volunteer persistent history keeps unresolved lost child protocol active', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse(
+        'volunteer_policy',
+        'What should I do next?',
+        {
+          chatHistory: [
+            {
+              sender: 'user',
+              text: 'Lost child incident for Sania, age 12, dark blue shirt, last seen Gate C, guardian contact 9911446670.'
+            },
+            {
+              sender: 'bot',
+              text: 'Code Amber active. Notify security and Guest Services.',
+              intent: 'lost_child'
+            },
+            {
+              sender: 'user',
+              text: 'What should I do next?'
+            }
+          ]
+        }
+      );
+
+      expect(res.intent).toBe('lost_child');
+      expect(res.answer).toContain('Code Amber active');
+      expect(res.answer).toContain('Guest Services Desk Section 112');
+      expect(res.memoryState.type).toBe('lost_child');
     });
   });
 

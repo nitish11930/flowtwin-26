@@ -1,10 +1,25 @@
 import { GoogleGenAI } from '@google/genai';
 import policies from '../data/stadium-policies.json';
 import liveCrowd from '../data/live-crowd-data.json';
+import stadiumMap from '../data/stadium-map.json';
 import { calculateBestRoute } from './routingEngine';
 import { buildAmenityAnswer, findBestAmenity, parseAmenitySearchContext } from './amenityEngine';
 
 type AIMode = 'fan_navigation' | 'volunteer_policy' | 'operations_command' | 'announcement' | 'incident_support';
+
+type ChatHistoryMessage = {
+  sender?: 'user' | 'bot';
+  role?: 'user' | 'assistant' | 'model' | 'bot';
+  text?: string;
+  content?: string;
+  intent?: string;
+};
+
+type EmergencyMemoryState = {
+  isActive: boolean;
+  type?: 'lost_child' | 'medical';
+  resolved: boolean;
+};
 
 type LostChildDetails = {
   childName?: string;
@@ -27,12 +42,38 @@ export async function generateAiResponse(
   message: string,
   extraContext?: any
 ): Promise<any> {
-  const safetyResponse = getSafetyCriticalResponse(mode, message);
-  if (safetyResponse) {
-    return safetyResponse;
+  const chatHistory = normalizeChatHistory(extraContext?.chatHistory ?? extraContext?.messages);
+  const latestMessage = message || getLastUserMessage(chatHistory) || '';
+  const dynamicContext = buildDynamicAiContext(mode, latestMessage, chatHistory, extraContext);
+  const safetyMessage = dynamicContext.emergencyState.isActive
+    ? buildEmergencyMemoryMessage(latestMessage, chatHistory)
+    : latestMessage;
+
+  if (dynamicContext.emergencyState.resolved) {
+    return {
+      intent: 'emergency_resolved',
+      severity: 'low',
+      answer: 'Understood. I have marked the emergency context as resolved for this conversation. What do you need help with next?',
+      createIncidentSuggested: false
+    };
   }
 
-  const scenarioResponse = getScenarioPatternResponse(mode, message, extraContext);
+  const safetyResponse = getSafetyCriticalResponse(mode, safetyMessage);
+  if (safetyResponse) {
+    return {
+      ...safetyResponse,
+      memoryState: dynamicContext.emergencyState
+    };
+  }
+
+  const enrichedContext = {
+    ...extraContext,
+    chatHistory,
+    dynamicContext,
+    systemInstruction: dynamicContext.systemInstruction
+  };
+
+  const scenarioResponse = getScenarioPatternResponse(mode, latestMessage, enrichedContext);
   if (scenarioResponse) {
     return scenarioResponse;
   }
@@ -41,28 +82,31 @@ export async function generateAiResponse(
   const hasOpenAi = !!process.env.OPENAI_API_KEY;
 
   if (!hasGemini && !hasOpenAi) {
-    return deterministicFallback(mode, message, extraContext);
+    return deterministicFallback(mode, latestMessage, enrichedContext);
   }
-
-  const systemPrompt = `You are FlowTwin 26 AI Assistant, the backend intelligence for a FIFA World Cup 2026 stadium operations platform. You are not a separate product section. You power the existing fan, volunteer, operations, announcement, and incident features. Always use provided app data, route logic, policies, incident records, and crowd metrics before answering. Do not invent stadium rules, gate status, medical instructions, security powers, or emergency lockdowns. Keep responses short, practical, safe, and useful during live matchday operations.`;
 
   const contextData = JSON.stringify({
     policies,
     liveCrowd,
-    bestRoute: mode === 'fan_navigation' ? calculateBestRoute({ requiresAccessibility: message.toLowerCase().includes('accessible') || message.toLowerCase().includes('wheelchair') }) : null,
-    ...extraContext
+    stadiumMap,
+    liveState: dynamicContext.liveState,
+    emergencyState: dynamicContext.emergencyState,
+    bestRoute: mode === 'fan_navigation' ? calculateBestRoute({ requiresAccessibility: latestMessage.toLowerCase().includes('accessible') || latestMessage.toLowerCase().includes('wheelchair') }) : null,
+    ...enrichedContext
   });
 
-  const fullPrompt = `${systemPrompt}\n\nContext Data:\n${contextData}\n\nUser Request: ${message}\n\nPlease respond in valid JSON matching the format required for the ${mode} mode.`;
+  const finalUserPrompt = `Current user request: ${latestMessage}\n\nContext data for this turn:\n${contextData}\n\nRespond as valid JSON for the ${mode} mode. The answer field must be natural language for the current user role.`;
+  const geminiContents = buildGeminiContents(chatHistory, finalUserPrompt);
 
   try {
     if (hasGemini) {
       const ai = new GoogleGenAI({});
       const response = await ai.models.generateContent({
         model: 'gemini-2.5-flash',
-        contents: fullPrompt,
+        contents: geminiContents,
         config: {
           responseMimeType: 'application/json',
+          systemInstruction: dynamicContext.systemInstruction,
         }
       });
       return JSON.parse(response.text || '{}');
@@ -77,8 +121,9 @@ export async function generateAiResponse(
         body: JSON.stringify({
           model: 'gpt-4o-mini',
           messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: `Context Data:\n${contextData}\n\nUser Request: ${message}\n\nPlease respond in valid JSON matching the format required for the ${mode} mode.` }
+            { role: 'system', content: dynamicContext.systemInstruction },
+            ...buildOpenAiMessages(chatHistory),
+            { role: 'user', content: finalUserPrompt }
           ],
           response_format: { type: 'json_object' }
         })
@@ -88,8 +133,206 @@ export async function generateAiResponse(
     }
   } catch (error) {
     console.error('LLM Failed, using fallback:', error);
-    return deterministicFallback(mode, message, extraContext);
+    return deterministicFallback(mode, latestMessage, enrichedContext);
   }
+}
+
+function normalizeChatHistory(rawHistory: unknown): ChatHistoryMessage[] {
+  if (!Array.isArray(rawHistory)) return [];
+
+  return rawHistory
+    .map((item) => {
+      if (!item || typeof item !== 'object') return null;
+      const message = item as ChatHistoryMessage;
+      const text = typeof message.text === 'string'
+        ? message.text
+        : typeof message.content === 'string'
+          ? message.content
+          : '';
+
+      if (!text.trim()) return null;
+
+      return {
+        sender: message.sender,
+        role: message.role,
+        text: text.trim(),
+        intent: message.intent
+      };
+    })
+    .filter(Boolean)
+    .slice(-20) as ChatHistoryMessage[];
+}
+
+function getLastUserMessage(chatHistory: ChatHistoryMessage[]) {
+  return [...chatHistory]
+    .reverse()
+    .find(message => getMessageSpeaker(message) === 'user')
+    ?.text;
+}
+
+function getMessageSpeaker(message: ChatHistoryMessage) {
+  if (message.sender === 'bot' || message.role === 'assistant' || message.role === 'model' || message.role === 'bot') {
+    return 'model';
+  }
+
+  return 'user';
+}
+
+function buildDynamicAiContext(
+  mode: AIMode,
+  latestMessage: string,
+  chatHistory: ChatHistoryMessage[],
+  extraContext?: any
+) {
+  const liveState = buildLiveStateSummary();
+  const emergencyState = detectEmergencyMemory(latestMessage, chatHistory);
+  const userRole = extraContext?.userRole || getUserRole(mode);
+  const personaInstruction = getPersonaInstruction(mode);
+  const emergencyInstruction = emergencyState.isActive
+    ? `Ongoing emergency memory: ${emergencyState.type === 'medical' ? 'Code Red medical' : 'Code Amber lost child'} is active in this conversation. Bypass standard routing, food, and small-talk flows until the user clearly resolves it. Continue emergency protocol, ask only for missing critical details, and keep the user anchored to safe next actions.`
+    : 'No unresolved emergency is active in the current conversation memory.';
+
+  const systemInstruction = [
+    'You are FlowTwin 26 Single Brain, the persistent GenAI intelligence for FIFA World Cup 2026 stadium operations.',
+    `User Role: ${userRole}.`,
+    personaInstruction,
+    'Do not break the assigned persona.',
+    'Return JSON only to the backend API. The answer field must be plain natural language for the user.',
+    'Never place raw JSON, internal incident IDs, private contacts, hidden chain-of-thought, or staff-only protocols inside a fan-facing answer.',
+    'Use conversation history as persistent memory. Do not forget earlier emergency details, accessibility needs, language preference, location, or destination.',
+    emergencyInstruction,
+    `Live State: ${liveState}`,
+    'Use stadium-map.json and live-crowd-data.json context before giving routes, crowd guidance, dispatch advice, or announcements.',
+    'Do not invent stadium rules, emergency lockdowns, gate closures, or medical powers that are not present in the app context.'
+  ].join('\n');
+
+  return {
+    systemInstruction,
+    emergencyState,
+    liveState
+  };
+}
+
+function getUserRole(mode: AIMode) {
+  switch (mode) {
+    case 'fan_navigation':
+      return 'You are speaking to a stadium Fan.';
+    case 'volunteer_policy':
+      return 'You are guiding a Sector Volunteer.';
+    case 'operations_command':
+      return 'You are advising an Operations Organizer.';
+    case 'announcement':
+      return 'You are helping stadium staff compose public announcements.';
+    case 'incident_support':
+      return 'You are assisting venue staff with incident support.';
+    default:
+      return 'You are assisting a stadium user.';
+  }
+}
+
+function getPersonaInstruction(mode: AIMode) {
+  switch (mode) {
+    case 'fan_navigation':
+      return 'Fan persona rules: be calm, simple, multilingual when needed, privacy-safe, and action-oriented. Do not expose staff workflow details or incident IDs to fans.';
+    case 'volunteer_policy':
+      return 'Volunteer persona rules: give concise protocol steps, safe escalation contacts, missing-detail checks, privacy reminders, and operational actions for the assigned sector.';
+    case 'operations_command':
+      return 'Operations persona rules: prioritize safety, crowd pressure, accessibility lanes, dispatch sequencing, and manager-ready summaries.';
+    case 'announcement':
+      return 'Announcement persona rules: produce short, safe, public-facing text. Remove private contact data and avoid panic language.';
+    default:
+      return 'Persona rules: keep responses practical, safe, and grounded in stadium context.';
+  }
+}
+
+function buildLiveStateSummary() {
+  const congestion = Object.entries(liveCrowd.congestion ?? {})
+    .map(([location, data]: [string, any]) => `${location}: ${data.level}, wait ${data.estimatedWaitTimeMins} mins`)
+    .join('; ');
+  const gates = Object.entries(stadiumMap.gates ?? {})
+    .map(([gate, data]: [string, any]) => `${gate}: ${data.status}`)
+    .join('; ');
+  const transit = Object.entries(stadiumMap.transit ?? {})
+    .map(([name, data]: [string, any]) => `${name}: ${data.status}${data.delayMinutes ? `, ${data.delayMinutes} min delay` : ''}`)
+    .join('; ');
+  const activeAlerts = (liveCrowd.weatherAlerts ?? [])
+    .filter((alert: any) => alert.active)
+    .map((alert: any) => `${alert.type} ${alert.severity}: ${alert.message}`)
+    .join('; ') || 'No active weather emergency.';
+
+  return `Crowd: ${congestion}. Gates: ${gates}. Transit: ${transit}. Weather: ${activeAlerts}`;
+}
+
+function detectEmergencyMemory(latestMessage: string, chatHistory: ChatHistoryMessage[]): EmergencyMemoryState {
+  const memoryTexts = chatHistory
+    .filter(message => getMessageSpeaker(message) === 'user' || message.intent === 'lost_child' || message.intent === 'medical')
+    .map(message => message.text);
+  const transcript = [...memoryTexts, latestMessage].join('\n').toLowerCase();
+  const latestLower = latestMessage.toLowerCase();
+  const resolved =
+    /\b(found|reunited|resolved|safe now|cancel code|stand down|closed)\b/.test(latestLower) &&
+    /\b(child|kid|person|patient|medical|incident|emergency|sania)\b/.test(latestLower);
+
+  if (resolved) {
+    return { isActive: false, resolved: true };
+  }
+
+  const hasLostChild =
+    transcript.includes('lost child') ||
+    transcript.includes('missing child') ||
+    transcript.includes('my child') ||
+    /\b(child|kid)\b.*\b(missing|lost)\b/.test(transcript) ||
+    transcript.includes('code amber');
+
+  const hasMedical =
+    transcript.includes('medical') ||
+    transcript.includes('code red') ||
+    transcript.includes('chest pain') ||
+    transcript.includes('cannot breathe') ||
+    transcript.includes('fainted') ||
+    transcript.includes('unconscious') ||
+    transcript.includes('breathing difficulty');
+
+  if (hasMedical) {
+    return { isActive: true, type: 'medical', resolved: false };
+  }
+
+  if (hasLostChild) {
+    return { isActive: true, type: 'lost_child', resolved: false };
+  }
+
+  return { isActive: false, resolved: false };
+}
+
+function buildEmergencyMemoryMessage(latestMessage: string, chatHistory: ChatHistoryMessage[]) {
+  const relevantHistory = chatHistory
+    .filter(message => message.text)
+    .map(message => `${getMessageSpeaker(message) === 'model' ? 'Assistant' : 'User'}: ${message.text}`)
+    .join('\n');
+
+  return `${relevantHistory}\nUser: ${latestMessage}`.slice(-5000);
+}
+
+function buildGeminiContents(chatHistory: ChatHistoryMessage[], finalUserPrompt: string) {
+  const historyContents = chatHistory.map(message => ({
+    role: getMessageSpeaker(message),
+    parts: [{ text: message.text || '' }]
+  }));
+
+  return [
+    ...historyContents,
+    {
+      role: 'user',
+      parts: [{ text: finalUserPrompt }]
+    }
+  ];
+}
+
+function buildOpenAiMessages(chatHistory: ChatHistoryMessage[]) {
+  return chatHistory.map(message => ({
+    role: getMessageSpeaker(message) === 'model' ? 'assistant' : 'user',
+    content: message.text || ''
+  }));
 }
 
 function getSafetyCriticalResponse(mode: AIMode, message: string) {
