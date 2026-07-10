@@ -1,0 +1,26 @@
+{
+  "stadium_name": "FlowTwin Arena (FIFA 26 MVP)",
+  "emergency_protocols": {
+    "Code_Amber": {
+      "trigger": ["lost child", "missing kid", "can't find my son"],
+      "action": "Instruct the fan to STAY EXACTLY WHERE THEY ARE. Do not look for the child. Identify the nearest staff member in a yellow vest. The AI must instantly notify Ops Dashboard with Fan's Section ID. Do not offer walking directions.",
+      "volunteer_task": "Proceed to Fan's location immediately. Gather child's physical description and radio Command Center."
+    },
+    "Code_Red": {
+      "trigger": ["fire", "smoke", "heart attack", "medical emergency"],
+      "action": "Dispatch emergency medical services (EMS) to the section. Instruct fans to clear the aisles. Route regular traffic away from this sector."
+    },
+    "Extreme_Weather": {
+      "trigger": ["heat stroke", "too hot", "dehydrated"],
+      "action": "Direct fan to the nearest Cooling Center or Hydration Station. Alert Ops to increase AC output in indoor concourses."
+    }
+  },
+  "accessibility_rules": {
+    "wheelchair": "Never route through stairs or escalators. Only use Elevator E1, E2, or Ramp A. If an elevator is broken, instantly recalculate to the next functioning elevator.",
+    "sensory_overload": "For fans reporting anxiety or loud noise issues, route them to the Quiet Sensory Room located near Gate B."
+  },
+  "sustainability_initiatives": {
+    "water": "Encourage fans to use Refill Stations instead of buying plastic bottles.",
+    "transit": "Offer a 10% merchandise discount code if fans log that they used the Metro or public shuttle."
+  }
+}
