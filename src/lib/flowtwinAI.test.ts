@@ -1,5 +1,6 @@
 import { expect, test, describe } from 'vitest';
 import { generateAiResponse } from './flowtwinAI';
+import { retrieveStadiumKnowledge } from './ragKnowledge';
 
 describe('Shared FlowTwin AI Service', () => {
   const withNoKey = async (fn: () => Promise<void>) => {
@@ -13,6 +14,13 @@ describe('Shared FlowTwin AI Service', () => {
     if (origGemini) process.env.GEMINI_API_KEY = origGemini;
     if (origOpenai) process.env.OPENAI_API_KEY = origOpenai;
   };
+
+  test('RAG retrieves Code Amber policy as source of truth', () => {
+    const chunks = retrieveStadiumKnowledge("I can't find my son", 'fan_navigation', 'lost_child');
+    expect(chunks[0].source).toBe('stadium-policies.json');
+    expect(chunks[0].text).toContain('STAY EXACTLY WHERE THEY ARE');
+    expect(chunks[0].text).toContain('Do not offer walking directions');
+  });
 
   test('lost child does not mention fake lockdown (volunteer policy)', async () => {
     await withNoKey(async () => {
@@ -70,6 +78,19 @@ describe('Shared FlowTwin AI Service', () => {
       expect(res.intent).toBe('lost_child');
       expect(res.createIncidentSuggested).toBe(true);
       expect(res.answer).toContain('Code Amber');
+    });
+  });
+
+  test('cannot find son phrasing triggers Code Amber, not navigation', async () => {
+    await withNoKey(async () => {
+      const fanRes = await generateAiResponse('fan_navigation', 'I can not find my son near Gate C');
+      const volunteerRes = await generateAiResponse('volunteer_policy', 'A fan says they cannot find their son near Gate C. What should I do?');
+
+      expect(fanRes.intent).toBe('lost_child');
+      expect(fanRes.answer).toContain('STAY EXACTLY WHERE YOU ARE');
+      expect(fanRes.answer.toLowerCase()).not.toContain('route');
+      expect(volunteerRes.intent).toBe('lost_child');
+      expect(volunteerRes.answer).toContain('radio Command Center');
     });
   });
 
@@ -261,8 +282,9 @@ describe('Shared FlowTwin AI Service', () => {
 
       expect(res.intent).toBe('lost_child');
       expect(res.answer).toContain('Code Amber active');
-      expect(res.answer).toContain('Do not publicly announce private contact details');
-      expect(res.actions).toContain('Mark Security Notified after contacting staff');
+      expect(res.answer).toContain('radio Command Center');
+      expect(res.answer).toContain('do not publicly announce private contact details');
+      expect(res.actions).toContain('Radio Command Center');
       expect(res.capturedDetails.childName).toBe('Sania');
       expect(res.capturedDetails.clothing).toBe('dark blue shirt');
       expect(res.requiredDetails).toEqual(['time last seen']);
@@ -318,7 +340,8 @@ describe('Shared FlowTwin AI Service', () => {
 
       expect(res.intent).toBe('lost_child');
       expect(res.answer).toContain('Code Amber');
-      expect(res.checklist).toContain('Notify nearest usher or security guard');
+      expect(res.checklist).toContain("Gather the child's physical description");
+      expect(res.recommendedContact).toContain('Command Center');
     });
   });
 
@@ -328,9 +351,9 @@ describe('Shared FlowTwin AI Service', () => {
 
       expect(res.intent).toBe('medical');
       expect(res.severity).toBe('red');
-      expect(res.actions).toContain('Mark Medical notified in the incident card');
-      expect(res.actions).toContain('Dispatch first aid and guide them to the exact location');
-      expect(res.answer).toContain('Do not move');
+      expect(res.actions).toContain('Mark EMS notified in the incident card');
+      expect(res.actions).toContain('Dispatch EMS and guide them to the exact location');
+      expect(res.answer.toLowerCase()).toContain('do not move');
       expect(res.capturedDetails.location).toBe('Section 105');
       expect(res.capturedDetails.breathingStatus).toBe('breathing');
     });
@@ -369,12 +392,12 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
-  test('volunteer notified security gets Guest Services next step', async () => {
+  test('volunteer notified security gets Command Center next step', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse('volunteer_policy', 'I have notified security for the lost child. What is next?');
 
       expect(res.intent).toBe('lost_child_next_step');
-      expect(res.answer).toContain('Guest Services Desk Section 112');
+      expect(res.answer).toContain('Command Center');
       expect(res.answer).toContain('timeline');
       expect(res.createIncidentSuggested).toBe(false);
     });
@@ -455,7 +478,7 @@ describe('Shared FlowTwin AI Service', () => {
 
       expect(res.intent).toBe('lost_child');
       expect(res.answer).toContain('Code Amber active');
-      expect(res.answer).toContain('Guest Services Desk Section 112');
+      expect(res.answer).toContain('radio Command Center');
       expect(res.memoryState.type).toBe('lost_child');
     });
   });

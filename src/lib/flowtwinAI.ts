@@ -4,6 +4,7 @@ import liveCrowd from '../data/live-crowd-data.json';
 import stadiumMap from '../data/stadium-map.json';
 import { calculateBestRoute } from './routingEngine';
 import { buildAmenityAnswer, findBestAmenity, parseAmenitySearchContext } from './amenityEngine';
+import { buildRagContext } from './ragKnowledge';
 
 type AIMode = 'fan_navigation' | 'volunteer_policy' | 'operations_command' | 'announcement' | 'incident_support';
 
@@ -91,11 +92,12 @@ export async function generateAiResponse(
     stadiumMap,
     liveState: dynamicContext.liveState,
     emergencyState: dynamicContext.emergencyState,
+    retrievedKnowledge: dynamicContext.rag.retrieved,
     bestRoute: mode === 'fan_navigation' ? calculateBestRoute({ requiresAccessibility: latestMessage.toLowerCase().includes('accessible') || latestMessage.toLowerCase().includes('wheelchair') }) : null,
     ...enrichedContext
   });
 
-  const finalUserPrompt = `Current user request: ${latestMessage}\n\nContext data for this turn:\n${contextData}\n\nRespond as valid JSON for the ${mode} mode. The answer field must be natural language for the current user role.`;
+  const finalUserPrompt = `Current user request: ${latestMessage}\n\nRetrieved stadium knowledge:\n${dynamicContext.rag.contextText}\n\nContext data for this turn:\n${contextData}\n\nRespond as valid JSON for the ${mode} mode. The answer field must be natural language for the current user role.`;
   const geminiContents = buildGeminiContents(chatHistory, finalUserPrompt);
 
   try {
@@ -186,6 +188,7 @@ function buildDynamicAiContext(
 ) {
   const liveState = buildLiveStateSummary();
   const emergencyState = detectEmergencyMemory(latestMessage, chatHistory);
+  const rag = buildRagContext(latestMessage, mode, emergencyState.type);
   const userRole = extraContext?.userRole || getUserRole(mode);
   const personaInstruction = getPersonaInstruction(mode);
   const emergencyInstruction = emergencyState.isActive
@@ -201,15 +204,18 @@ function buildDynamicAiContext(
     'Never place raw JSON, internal incident IDs, private contacts, hidden chain-of-thought, or staff-only protocols inside a fan-facing answer.',
     'Use conversation history as persistent memory. Do not forget earlier emergency details, accessibility needs, language preference, location, or destination.',
     emergencyInstruction,
+    'Authoritative retrieved stadium knowledge follows. Treat it as source of truth over general model knowledge.',
+    rag.contextText,
     `Live State: ${liveState}`,
-    'Use stadium-map.json and live-crowd-data.json context before giving routes, crowd guidance, dispatch advice, or announcements.',
+    'Use retrieved chunks from stadium-policies.json, stadium-map.json, live-crowd-data.json, routes.json, amenities.json, and transport-status.json before giving routes, crowd guidance, dispatch advice, or announcements.',
     'Do not invent stadium rules, emergency lockdowns, gate closures, or medical powers that are not present in the app context.'
   ].join('\n');
 
   return {
     systemInstruction,
     emergencyState,
-    liveState
+    liveState,
+    rag
   };
 }
 
@@ -282,6 +288,7 @@ function detectEmergencyMemory(latestMessage: string, chatHistory: ChatHistoryMe
     transcript.includes('missing child') ||
     transcript.includes('my child') ||
     /\b(child|kid)\b.*\b(missing|lost)\b/.test(transcript) ||
+    /\b(can'?t|cant|cannot|can not)\s+find\s+(my|our|their|his|her)\s+(son|daughter|child|kid)\b/.test(transcript) ||
     transcript.includes('code amber');
 
   const hasMedical =
@@ -347,14 +354,14 @@ function getSafetyCriticalResponse(mode: AIMode, message: string) {
     return {
       intent: 'lost_child_next_step',
       severity: 'amber',
-      answer: 'Good. Next, send the Code Amber details to Guest Services Desk Section 112, keep the reporting guardian at the last-seen location, update the incident timeline as Security Notified, and fill any missing detail such as time last seen.',
+      answer: 'Good. Next, radio Command Center with the Code Amber details, keep the reporting guardian exactly where they are, update the incident timeline as Security Notified, and fill any missing detail such as time last seen.',
       checklist: [
-        'Send details to Guest Services Desk Section 112',
-        'Keep guardian at last-seen location',
+        'Radio Command Center with Code Amber details',
+        'Keep guardian at exact reported location',
         'Update missing details in the incident card',
-        'Wait for security or guest services handoff'
+        'Wait for Command Center handoff'
       ],
-      recommendedContact: 'Guest Services Desk Section 112',
+      recommendedContact: 'Command Center radio channel',
       createIncidentSuggested: false
     };
   }
@@ -364,6 +371,16 @@ function getSafetyCriticalResponse(mode: AIMode, message: string) {
     lowerMsg.includes('child lost') ||
     lowerMsg.includes('my child') ||
     lowerMsg.includes('kid lost') ||
+    lowerMsg.includes('missing kid') ||
+    lowerMsg.includes("can't find my son") ||
+    lowerMsg.includes('cant find my son') ||
+    lowerMsg.includes('cannot find my son') ||
+    lowerMsg.includes('can not find my son') ||
+    lowerMsg.includes("can't find my daughter") ||
+    lowerMsg.includes('cant find my daughter') ||
+    lowerMsg.includes('cannot find my daughter') ||
+    lowerMsg.includes('can not find my daughter') ||
+    /\b(can'?t|cant|cannot|can not)\s+find\s+(my|our|their|his|her)\s+(son|daughter|child|kid)\b/.test(lowerMsg) ||
     lowerMsg.includes('missing child') ||
     lowerMsg.includes('has been lost') ||
     /\b(child|kid)\b.*\bmissing\b/.test(lowerMsg) ||
@@ -386,24 +403,24 @@ function getSafetyCriticalResponse(mode: AIMode, message: string) {
       intent: 'lost_child',
       severity: 'amber',
       answer: isVolunteer
-        ? `Code Amber active. ${capturedSummary} ${missingText} Stay at ${locationText} with the reporting guardian. Notify the nearest usher or security guard now. Send captured details to Guest Services Desk Section 112 through the incident channel. Do not publicly announce private contact details.`
-        : `Code Amber incident draft ready. ${capturedSummary} ${missingText} Stay at ${locationText}. Notify the nearest usher or security guard now and send this summary to Guest Services Desk Section 112. Do not leave the last-seen area alone; assign one person to contact staff.`,
+        ? `Code Amber active. ${capturedSummary} ${missingText} Proceed to ${locationText} immediately, gather the child's physical description, and radio Command Center. Keep the reporting guardian exactly where they are and do not publicly announce private contact details.`
+        : `Code Amber active. ${capturedSummary} ${missingText} STAY EXACTLY WHERE YOU ARE at ${locationText}. Do not look for the child yourself and do not start walking. Identify the nearest staff member in a yellow vest. I am escalating this to Ops Dashboard with your reported section/location.`,
       checklist: [
-        `Stay at ${locationText}`,
-        'Notify nearest usher or security guard',
-        'Send captured details to Guest Services Desk Section 112',
-        'Create a Code Amber incident'
+        isVolunteer ? `Proceed to ${locationText} immediately` : `Stay exactly where you are at ${locationText}`,
+        isVolunteer ? "Gather the child's physical description" : 'Do not look for the child yourself',
+        isVolunteer ? 'Radio Command Center' : 'Identify the nearest staff member in a yellow vest',
+        'Escalate Code Amber to Ops Dashboard'
       ],
       actions: [
         isVolunteer ? 'Assign the open incident to yourself' : 'Tap Create Incident',
-        'Mark Security Notified after contacting staff',
-        'Show this summary to the nearest usher or security guard',
-        'Keep the reporting guardian at the last-seen location',
+        isVolunteer ? 'Proceed to the fan location' : 'Stay in place while staff comes to you',
+        isVolunteer ? 'Radio Command Center' : 'Show this summary to yellow-vest staff',
+        'Keep the reporting guardian at the exact location',
         'Update the incident when the missing detail is known'
       ],
       capturedDetails: details,
       requiredDetails: missingDetails,
-      recommendedContact: 'Guest Services Desk Section 112',
+      recommendedContact: isVolunteer ? 'Command Center radio channel' : 'Nearest yellow-vest staff member / Ops Dashboard',
       createIncidentSuggested: true,
       incidentDraft: {
         type: 'lost_child',
@@ -444,11 +461,11 @@ function getSafetyCriticalResponse(mode: AIMode, message: string) {
     return {
       intent: 'medical',
       severity: 'red',
-      answer: `Code Red incident draft ready. ${capturedSummary} Call medical dispatch or the nearest first-aid team immediately. Do not move the person unless there is immediate danger. Keep the area clear and share exact location, symptoms, and consciousness/breathing status.`,
-      checklist: ['Call first aid', 'Do not move person unless unsafe', 'Keep crowd away', 'Guide medical staff to exact location'],
+      answer: `Code Red active. ${capturedSummary} Dispatch emergency medical services to the section now. Clear the aisles, keep regular traffic away from this sector, and do not move the person unless there is immediate danger.`,
+      checklist: ['Dispatch EMS to the section', 'Clear the aisles', 'Route regular traffic away from this sector', 'Do not move person unless unsafe'],
       actions: [
-        mode === 'volunteer_policy' ? 'Mark Medical notified in the incident card' : 'Call first aid now',
-        mode === 'volunteer_policy' ? 'Dispatch first aid and guide them to the exact location' : 'Keep the area clear',
+        mode === 'volunteer_policy' ? 'Mark EMS notified in the incident card' : 'Call emergency medical services now',
+        mode === 'volunteer_policy' ? 'Dispatch EMS and guide them to the exact location' : 'Clear the aisle around the person',
         'Do not move the person unless unsafe',
         'Share this medical summary with staff'
       ],
@@ -464,6 +481,29 @@ function getSafetyCriticalResponse(mode: AIMode, message: string) {
         severity: 'red',
         missingDetails: Object.fromEntries(missingDetails.map(detail => [detail, 'missing']))
       }
+    };
+  }
+
+  const hasExtremeWeatherSignal =
+    lowerMsg.includes('heat stroke') ||
+    lowerMsg.includes('too hot') ||
+    lowerMsg.includes('dehydrated') ||
+    lowerMsg.includes('dehydration') ||
+    lowerMsg.includes('heat exhaustion');
+
+  if (hasExtremeWeatherSignal) {
+    return {
+      intent: 'extreme_weather',
+      severity: 'high',
+      answer: 'Extreme Weather support. Go to the nearest Cooling Center or Hydration Station now. Use refill stations instead of buying plastic bottles where possible. I am flagging Ops to increase AC output in indoor concourses.',
+      checklist: [
+        'Move to nearest Cooling Center or Hydration Station',
+        'Use refill station for water if safe',
+        'Alert Ops about heat risk',
+        'Seek medical help immediately if symptoms are severe'
+      ],
+      recommendedContact: 'Cooling Center / Hydration Station / Ops Dashboard',
+      createIncidentSuggested: true
     };
   }
 
@@ -532,7 +572,7 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
         intent: 'navigation',
         language: 'hi',
         answer: route
-          ? `Hindi सहायता: सबसे सुरक्षित accessible entrance ${route.route.startPoint} है. ${route.route.name} लें; यह wheelchair-friendly है और भीड़ वाले Gate C से बचाता है.`
+          ? `Hindi सहायता: सबसे सुरक्षित accessible entrance ${route.route.startPoint} है. ${route.route.name} लें; wheelchair के लिए केवल Elevator E1, Elevator E2, या Ramp A use करें. Stairs या escalators न लें, और भीड़ वाले Gate C से बचें.`
           : 'Hindi सहायता: अभी accessible route calculate नहीं हो पाया. कृपया nearest volunteer से accessible entrance पूछें.',
         accessibility: true,
         crowdAware: true
@@ -543,7 +583,7 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
       const route = calculateBestRoute({ requiresAccessibility: wantsAccessibleRoute }, wantsCrowdAvoidance || lowerMsg.includes('gate c'));
       if (route) {
         const accessibilityText = route.route.isAccessible
-          ? 'It is wheelchair accessible and avoids stairs.'
+          ? 'It is wheelchair accessible: use only Elevator E1, Elevator E2, or Ramp A, and avoid stairs or escalators.'
           : 'This route is not fully accessible, so ask a volunteer before using it.';
         const congestionText = 'Gate C is marked severe in live crowd data, so this recommendation avoids the highest-pressure path.';
 
@@ -641,13 +681,13 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
       return {
         intent: 'privacy_policy',
         severity: 'high',
-        answer: 'No. Do not announce a guardian phone number or private contact details publicly. Share the contact only through the secure incident channel with Guest Services Desk Section 112, security, or Ops.',
+        answer: 'No. Do not announce a guardian phone number or private contact details publicly. Share the contact only through the secure incident channel with Command Center, security, or Ops.',
         checklist: [
           'Do not broadcast private contact details',
           'Use secure incident notes for phone numbers',
           'Share only child description and safe reunification instructions publicly'
         ],
-        recommendedContact: 'Guest Services Desk Section 112',
+        recommendedContact: 'Command Center radio channel',
         createIncidentSuggested: false
       };
     }
@@ -656,14 +696,14 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
       return {
         intent: 'lost_child_next_step',
         severity: 'amber',
-        answer: 'Good. Next, send the Code Amber details to Guest Services Desk Section 112, keep the reporting guardian at the last-seen location, update the incident timeline as Security Notified, and fill any missing detail such as time last seen.',
+        answer: 'Good. Next, radio Command Center with the Code Amber details, keep the reporting guardian exactly where they are, update the incident timeline as Security Notified, and fill any missing detail such as time last seen.',
         checklist: [
-          'Send details to Guest Services Desk Section 112',
-          'Keep guardian at last-seen location',
+          'Radio Command Center with Code Amber details',
+          'Keep guardian at exact reported location',
           'Update missing details in the incident card',
-          'Wait for security or guest services handoff'
+          'Wait for Command Center handoff'
         ],
-        recommendedContact: 'Guest Services Desk Section 112',
+        recommendedContact: 'Command Center radio channel',
         createIncidentSuggested: false
       };
     }
@@ -1044,10 +1084,10 @@ function deterministicFallback(mode: AIMode, message: string, extraContext?: any
         return {
           intent: 'lost_child',
           severity: 'amber',
-          answer: 'Code Amber. Stay at the last-seen location. Notify the nearest usher or security guard now. Please collect Sania’s age, clothing, last-seen location, time last seen, and guardian contact. I can create an incident for Guest Services Desk Section 112.',
-          checklist: ['Keep reporting person at exact location', 'Notify nearest security guard', 'Create Code Amber incident'],
+          answer: "Code Amber. Proceed to the fan's location immediately, keep the reporting guardian exactly where they are, gather the child's physical description, and radio Command Center.",
+          checklist: ["Proceed to fan's location", "Gather child's physical description", 'Radio Command Center', 'Escalate Code Amber to Ops Dashboard'],
           requiredDetails: ['age', 'clothing', 'lastSeenLocation', 'guardianContact'],
-          recommendedContact: 'Guest Services Desk Section 112',
+          recommendedContact: 'Command Center radio channel',
           createIncidentSuggested: true
         };
       }
@@ -1055,8 +1095,8 @@ function deterministicFallback(mode: AIMode, message: string, extraContext?: any
         return {
           intent: 'medical',
           severity: 'red',
-          answer: 'Code Red. Call medical dispatch immediately. Do not move the person unless there is immediate danger. What are their symptoms and exact location?',
-          checklist: ['Call first aid', 'Do not move person', 'Keep crowd away'],
+          answer: 'Code Red. Dispatch EMS to the section, clear the aisles, route regular traffic away from this sector, and do not move the person unless there is immediate danger.',
+          checklist: ['Dispatch EMS', 'Clear aisles', 'Route regular traffic away', 'Collect exact symptoms and location'],
           requiredDetails: ['symptoms', 'location', 'consciousness'],
           recommendedContact: 'First Aid stations at Sections 105, 215, 330',
           createIncidentSuggested: true
@@ -1077,9 +1117,9 @@ function deterministicFallback(mode: AIMode, message: string, extraContext?: any
         return {
           intent: 'lost_child',
           severity: 'amber',
-          answer: 'Code Amber. Stay at the last-seen location. Notify the nearest usher or security guard now. Please provide the child’s name, age, clothing, last-seen location, time last seen, and guardian contact.',
+          answer: 'Code Amber. STAY EXACTLY WHERE YOU ARE. Do not look for the child and do not start walking. Identify the nearest staff member in a yellow vest. I am escalating this to Ops Dashboard with your reported section/location.',
           requiredDetails: ['child name', 'age', 'clothing', 'last seen location', 'time last seen', 'guardian contact'],
-          recommendedContact: 'Guest Services Desk Section 112',
+          recommendedContact: 'Nearest yellow-vest staff member / Ops Dashboard',
           createIncidentSuggested: true
         };
       }
@@ -1087,7 +1127,7 @@ function deterministicFallback(mode: AIMode, message: string, extraContext?: any
         return {
           intent: 'medical',
           severity: 'red',
-          answer: 'Code Red. Call medical dispatch immediately. Do not move the person unless there is immediate danger. What are their symptoms and exact location?',
+          answer: 'Code Red. Emergency medical services must be dispatched to your section. Clear the aisles, keep other fans away from this sector, and do not move the person unless there is immediate danger.',
           requiredDetails: ['symptoms', 'location'],
           createIncidentSuggested: true
         };
@@ -1116,15 +1156,7 @@ function deterministicFallback(mode: AIMode, message: string, extraContext?: any
       };
 
     case 'announcement':
-      const publicSafeMessage = message.replace(/\b\d{7,15}\b/g, '[private contact removed]');
-      return {
-        english: publicSafeMessage,
-        spanish: `[ES] ${publicSafeMessage}`,
-        french: `[FR] ${publicSafeMessage}`,
-        portuguese: `[PT] ${publicSafeMessage}`,
-        arabic: `[AR] ${publicSafeMessage}`,
-        hindi: `[HI] ${publicSafeMessage}`
-      };
+      return buildPublicAnnouncement(message);
 
     case 'incident_support':
       return {

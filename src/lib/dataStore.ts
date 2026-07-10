@@ -254,7 +254,7 @@ export class DataStore {
       if (incident.dispatchNotified && !wasDispatchNotified) {
         incident.timeline = [
           ...(incident.timeline ?? []),
-          createTimelineEvent('in_progress', 'First-aid dispatch started')
+          createTimelineEvent('in_progress', 'EMS dispatch started')
         ];
       }
 

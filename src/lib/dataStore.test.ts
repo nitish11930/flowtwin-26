@@ -108,7 +108,7 @@ describe('DataStore incident action workflow', () => {
     const dispatched = store.updateIncident(incident.id, {
       status: 'in_progress',
       dispatchNotified: true,
-      notes: 'First-aid dispatch started.'
+      notes: 'EMS dispatch started.'
     });
 
     expect(teamNotified?.medicalTeamNotified).toBe(true);
@@ -116,7 +116,7 @@ describe('DataStore incident action workflow', () => {
     expect(dispatched?.status).toBe('in_progress');
     expect(dispatched?.dispatchNotified).toBe(true);
     expect(dispatched?.timeline?.map(event => event.label)).toEqual(
-      expect.arrayContaining(['Medical team notified', 'First-aid dispatch started', 'Response in progress'])
+      expect.arrayContaining(['Medical team notified', 'EMS dispatch started', 'Response in progress'])
     );
   });
 

@@ -26,6 +26,27 @@ const maskSensitiveText = (text: string) => (
   text.replace(/\b(\d{4})\d{3,9}(\d{2})\b/g, '$1****$2')
 );
 
+const policyCards = [
+  ...Object.entries(policies.emergency_protocols).map(([code, protocol]) => ({
+    category: code.replace('_', ' '),
+    protocol: code,
+    instruction: protocol.action,
+    contactLocation: 'Ops Dashboard / Command Center'
+  })),
+  {
+    category: 'Wheelchair Accessibility',
+    protocol: 'Access Assist',
+    instruction: policies.accessibility_rules.wheelchair,
+    contactLocation: 'Elevator E1, Elevator E2, or Ramp A'
+  },
+  {
+    category: 'Sensory Overload',
+    protocol: 'Access Assist',
+    instruction: policies.accessibility_rules.sensory_overload,
+    contactLocation: 'Quiet Sensory Room near Gate B'
+  }
+];
+
 export default function VolunteerDashboard() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -177,16 +198,16 @@ export default function VolunteerDashboard() {
       medicalTeamNotified: true,
       dispatchNotified: true,
       teamNotified: true,
-      notes: 'First-aid dispatch started and route support requested.'
+      notes: 'EMS dispatch started and route support requested.'
     });
   };
 
-  const sendToGuestServices = (incident: Incident) => {
+  const radioCommandCenter = (incident: Incident) => {
     updateIncident(incident.id, {
       status: getNextTeamStatus(incident),
       securityNotified: true,
       teamNotified: true,
-      notes: 'Code Amber details sent to Guest Services Desk Section 112.'
+      notes: 'Code Amber details radioed to Command Center.'
     });
   };
 
@@ -362,7 +383,7 @@ export default function VolunteerDashboard() {
                                 onClick={() => dispatchFirstAid(inc)}
                                 className="inline-flex min-h-10 items-center justify-center rounded-lg border border-red-200 bg-white px-3 py-2 text-center text-xs font-bold leading-tight text-red-700 hover:bg-red-50"
                               >
-                                <Radio className="mr-1.5 h-3.5 w-3.5" /> Dispatch first aid
+                                <Radio className="mr-1.5 h-3.5 w-3.5" /> Dispatch EMS
                               </button>
                               <button
                                 onClick={() => addMedicalSymptoms(inc)}
@@ -380,10 +401,10 @@ export default function VolunteerDashboard() {
                                 <Bell className="mr-1.5 h-3.5 w-3.5" /> Security notified
                               </button>
                               <button
-                                onClick={() => sendToGuestServices(inc)}
+                                onClick={() => radioCommandCenter(inc)}
                                 className="inline-flex min-h-10 items-center justify-center rounded-lg border border-indigo-200 bg-indigo-50 px-3 py-2 text-center text-xs font-bold leading-tight text-indigo-700 hover:bg-indigo-100"
                               >
-                                <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> Guest Services
+                                <ShieldCheck className="mr-1.5 h-3.5 w-3.5" /> Command Center
                               </button>
                               <button
                                 onClick={() => updateLastSeenTime(inc)}
@@ -415,7 +436,7 @@ export default function VolunteerDashboard() {
                           <ul className="mt-2 grid gap-1 text-xs text-amber-900 sm:grid-cols-2">
                             <li>Stay at last-seen location.</li>
                             <li>Notify nearest usher/security guard.</li>
-                            <li>Send details to Guest Services Desk Section 112.</li>
+                            <li>Radio Command Center with Code Amber details.</li>
                             <li>Do not publicly announce private contact details.</li>
                           </ul>
                           {missingDetails.length > 0 && (
@@ -456,10 +477,10 @@ export default function VolunteerDashboard() {
               <ShieldAlert className="mr-2 h-5 w-5 text-amber-500" /> Emergency Checklist
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {policies.policies.map(policy => (
+              {policyCards.map(policy => (
                 <div key={policy.category} className="p-4 rounded-xl border border-slate-200 bg-amber-50/30 hover:bg-amber-50/60 transition-colors">
                   <h3 className="font-bold text-amber-700 text-sm mb-2">{policy.category} ({policy.protocol})</h3>
-                  <p className="text-xs text-slate-600 mb-2">{policy.instructions[0]}</p>
+                  <p className="text-xs text-slate-600 mb-2">{policy.instruction}</p>
                   <p className="text-xs font-semibold text-slate-800">Contact: {policy.contactLocation}</p>
                 </div>
               ))}
