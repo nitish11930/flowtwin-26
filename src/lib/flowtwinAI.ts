@@ -46,7 +46,7 @@ export async function generateAiResponse(
   const chatHistory = normalizeChatHistory(extraContext?.chatHistory ?? extraContext?.messages);
   const latestMessage = message || getLastUserMessage(chatHistory) || '';
   const dynamicContext = buildDynamicAiContext(mode, latestMessage, chatHistory, extraContext);
-  const bypassEmergencyMemory = shouldBypassEmergencyMemory(mode, latestMessage);
+  const bypassEmergencyMemory = shouldBypassEmergencyMemory(mode, latestMessage, extraContext);
   const safetyMessage = dynamicContext.emergencyState.isActive && bypassEmergencyMemory === false
     ? buildEmergencyMemoryMessage(latestMessage, chatHistory)
     : latestMessage;
@@ -69,7 +69,9 @@ export async function generateAiResponse(
   if (safetyResponse) {
     return {
       ...safetyResponse,
-      memoryState: dynamicContext.emergencyState
+      memoryState: bypassEmergencyMemory
+        ? detectEmergencyMemory(latestMessage, [])
+        : dynamicContext.emergencyState
     };
   }
 
@@ -367,10 +369,16 @@ function buildEmergencyPersonaInstruction(mode: AIMode, emergencyType?: Emergenc
   return `Ongoing emergency memory: ${emergencyType === 'medical' ? 'Code Red medical' : 'Code Amber lost child'} is active in this conversation. Bypass standard routing, food, and small-talk flows until the user clearly resolves it. Continue emergency protocol, ask only for missing critical details, and keep the user anchored to safe next actions.`;
 }
 
-function shouldBypassEmergencyMemory(mode: AIMode, message: string) {
+function shouldBypassEmergencyMemory(mode: AIMode, message: string, extraContext?: any) {
   if (mode !== 'volunteer_policy') return false;
 
-  const quickAction = normalizeQuickAction(message);
+  const quickAction = normalizeQuickAction(extraContext?.quickAction || message);
+  const scopedQuickActions = ['lost child', 'medical', 'accessibility', 'crowd', 'directions', 'translate'];
+
+  if (extraContext?.isQuickAction && scopedQuickActions.includes(quickAction)) {
+    return true;
+  }
+
   return ['accessibility', 'crowd', 'directions', 'translate'].includes(quickAction);
 }
 

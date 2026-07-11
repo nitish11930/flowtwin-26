@@ -73,6 +73,7 @@ function buildFallbackIncidentDraft(message: Message): IncidentDraft {
 }
 
 const FAN_CHAT_STORAGE_KEY = 'flowtwin-fan-chat-history';
+const CHAT_HISTORY_TTL_MS = 30 * 60 * 1000;
 const FAN_INITIAL_MESSAGES: Message[] = [
   {
     id: '1',
@@ -88,10 +89,31 @@ function loadStoredMessages() {
     const stored = window.localStorage.getItem(FAN_CHAT_STORAGE_KEY);
     if (!stored) return FAN_INITIAL_MESSAGES;
     const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : FAN_INITIAL_MESSAGES;
+    const savedAt = typeof parsed?.savedAt === 'number' ? parsed.savedAt : null;
+    const storedMessages = Array.isArray(parsed?.messages)
+      ? parsed.messages
+      : Array.isArray(parsed)
+        ? parsed
+        : null;
+
+    if (!storedMessages || storedMessages.length === 0) return FAN_INITIAL_MESSAGES;
+    if (!savedAt || Date.now() - savedAt > CHAT_HISTORY_TTL_MS) {
+      window.localStorage.removeItem(FAN_CHAT_STORAGE_KEY);
+      return FAN_INITIAL_MESSAGES;
+    }
+
+    return storedMessages;
   } catch {
+    window.localStorage.removeItem(FAN_CHAT_STORAGE_KEY);
     return FAN_INITIAL_MESSAGES;
   }
+}
+
+function persistStoredMessages(messages: Message[]) {
+  window.localStorage.setItem(FAN_CHAT_STORAGE_KEY, JSON.stringify({
+    savedAt: Date.now(),
+    messages
+  }));
 }
 
 export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: boolean }) {
@@ -103,8 +125,32 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
   const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
-    window.localStorage.setItem(FAN_CHAT_STORAGE_KEY, JSON.stringify(messages));
+    persistStoredMessages(messages);
   }, [messages]);
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      try {
+        const stored = window.localStorage.getItem(FAN_CHAT_STORAGE_KEY);
+        if (!stored) return;
+        const parsed = JSON.parse(stored);
+        const savedAt = typeof parsed?.savedAt === 'number' ? parsed.savedAt : null;
+        if (!savedAt || Date.now() - savedAt > CHAT_HISTORY_TTL_MS) {
+          window.localStorage.removeItem(FAN_CHAT_STORAGE_KEY);
+          setMessages(FAN_INITIAL_MESSAGES);
+          setLastInput('');
+          setHasSearched(false);
+        }
+      } catch {
+        window.localStorage.removeItem(FAN_CHAT_STORAGE_KEY);
+        setMessages(FAN_INITIAL_MESSAGES);
+        setLastInput('');
+        setHasSearched(false);
+      }
+    }, 60 * 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
 
   useEffect(() => {
     if (hasSearched) {

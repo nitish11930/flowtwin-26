@@ -550,6 +550,103 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
+  test('volunteer medical quick action bypasses stale lost child memory', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse(
+        'volunteer_policy',
+        'Medical',
+        {
+          isQuickAction: true,
+          quickAction: 'Medical',
+          chatHistory: [
+            {
+              sender: 'user',
+              text: 'Lost child incident for Sania, age 12, dark blue shirt, last seen Gate C, guardian contact 9911446670.'
+            },
+            {
+              sender: 'bot',
+              text: 'Code Amber active. Notify security and radio Command Center.',
+              intent: 'lost_child'
+            },
+            {
+              sender: 'user',
+              text: 'Medical'
+            }
+          ]
+        }
+      );
+
+      expect(res.intent).toBe('medical');
+      expect(res.answer).toContain('Code Red active');
+      expect(res.answer).not.toContain('Code Amber active');
+    });
+  });
+
+  test('volunteer lost child quick action bypasses stale medical memory', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse(
+        'volunteer_policy',
+        'Lost Child',
+        {
+          isQuickAction: true,
+          quickAction: 'Lost Child',
+          chatHistory: [
+            {
+              sender: 'user',
+              text: 'Medical emergency at Section 105. Person fainted but is breathing.'
+            },
+            {
+              sender: 'bot',
+              text: 'Code Red active. Dispatch EMS and clear the aisle.',
+              intent: 'medical'
+            },
+            {
+              sender: 'user',
+              text: 'Lost Child'
+            }
+          ]
+        }
+      );
+
+      expect(res.intent).toBe('lost_child');
+      expect(res.answer).toContain('Code Amber active');
+      expect(res.answer).not.toContain('Code Red active');
+      expect(res.memoryState.type).toBe('lost_child');
+    });
+  });
+
+  test('volunteer crowd quick action bypasses stale lost child memory', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse(
+        'volunteer_policy',
+        'Crowd',
+        {
+          isQuickAction: true,
+          quickAction: 'Crowd',
+          chatHistory: [
+            {
+              sender: 'user',
+              text: 'Lost child incident for Sania, age 12, dark blue shirt, last seen Gate C, guardian contact 9911446670.'
+            },
+            {
+              sender: 'bot',
+              text: 'Code Amber active. Notify security and radio Command Center.',
+              intent: 'lost_child'
+            },
+            {
+              sender: 'user',
+              text: 'Crowd'
+            }
+          ]
+        }
+      );
+
+      expect(res.intent).toBe('crowd_policy');
+      expect(res.answer).toContain('Crowd support mode');
+      expect(res.answer).not.toContain('Code Amber');
+    });
+  });
+
   test('volunteer accessibility quick action gives ADA guidance', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse('volunteer_policy', 'Accessibility');

@@ -17,6 +17,7 @@ type Message = {
 
 const QUICK_ACTIONS = ['Lost Child', 'Medical', 'Accessibility', 'Crowd', 'Directions', 'Translate'];
 const VOLUNTEER_CHAT_STORAGE_KEY = 'flowtwin-volunteer-chat-history';
+const CHAT_HISTORY_TTL_MS = 30 * 60 * 1000;
 const VOLUNTEER_INITIAL_MESSAGES: Message[] = [
   {
     id: '1',
@@ -32,10 +33,31 @@ function loadStoredMessages() {
     const stored = window.localStorage.getItem(VOLUNTEER_CHAT_STORAGE_KEY);
     if (!stored) return VOLUNTEER_INITIAL_MESSAGES;
     const parsed = JSON.parse(stored);
-    return Array.isArray(parsed) && parsed.length > 0 ? parsed : VOLUNTEER_INITIAL_MESSAGES;
+    const savedAt = typeof parsed?.savedAt === 'number' ? parsed.savedAt : null;
+    const storedMessages = Array.isArray(parsed?.messages)
+      ? parsed.messages
+      : Array.isArray(parsed)
+        ? parsed
+        : null;
+
+    if (!storedMessages || storedMessages.length === 0) return VOLUNTEER_INITIAL_MESSAGES;
+    if (!savedAt || Date.now() - savedAt > CHAT_HISTORY_TTL_MS) {
+      window.localStorage.removeItem(VOLUNTEER_CHAT_STORAGE_KEY);
+      return VOLUNTEER_INITIAL_MESSAGES;
+    }
+
+    return storedMessages;
   } catch {
+    window.localStorage.removeItem(VOLUNTEER_CHAT_STORAGE_KEY);
     return VOLUNTEER_INITIAL_MESSAGES;
   }
+}
+
+function persistStoredMessages(messages: Message[]) {
+  window.localStorage.setItem(VOLUNTEER_CHAT_STORAGE_KEY, JSON.stringify({
+    savedAt: Date.now(),
+    messages
+  }));
 }
 
 export default function VolunteerChat() {
@@ -51,15 +73,39 @@ export default function VolunteerChat() {
   }, [messages, isTyping]);
 
   useEffect(() => {
-    window.localStorage.setItem(VOLUNTEER_CHAT_STORAGE_KEY, JSON.stringify(messages));
+    persistStoredMessages(messages);
   }, [messages]);
 
-  const handleSend = async (overrideText?: string) => {
+  useEffect(() => {
+    const intervalId = window.setInterval(() => {
+      try {
+        const stored = window.localStorage.getItem(VOLUNTEER_CHAT_STORAGE_KEY);
+        if (!stored) return;
+        const parsed = JSON.parse(stored);
+        const savedAt = typeof parsed?.savedAt === 'number' ? parsed.savedAt : null;
+        if (!savedAt || Date.now() - savedAt > CHAT_HISTORY_TTL_MS) {
+          window.localStorage.removeItem(VOLUNTEER_CHAT_STORAGE_KEY);
+          setMessages(VOLUNTEER_INITIAL_MESSAGES);
+          setIncidentNotice(null);
+        }
+      } catch {
+        window.localStorage.removeItem(VOLUNTEER_CHAT_STORAGE_KEY);
+        setMessages(VOLUNTEER_INITIAL_MESSAGES);
+        setIncidentNotice(null);
+      }
+    }, 60 * 1000);
+
+    return () => window.clearInterval(intervalId);
+  }, []);
+
+  const handleSend = async (overrideText?: string, options: { isQuickAction?: boolean } = {}) => {
     const userText = overrideText || input;
     if (!userText.trim()) return;
     
+    const isQuickAction = Boolean(options.isQuickAction);
     const newMsg: Message = { id: Date.now().toString(), sender: 'user', text: userText };
     const nextMessages = [...messages, newMsg];
+    const requestMessages = isQuickAction ? [newMsg] : nextMessages;
     setMessages(nextMessages);
     setInput('');
     setIsTyping(true);
@@ -71,7 +117,9 @@ export default function VolunteerChat() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           message: userText,
-          messages: nextMessages,
+          messages: requestMessages,
+          quickAction: isQuickAction ? userText : undefined,
+          isQuickAction,
           volunteerId: 'vol-123',
           sector: 'Sector 102',
           language: 'en'
@@ -157,7 +205,7 @@ export default function VolunteerChat() {
         {QUICK_ACTIONS.map(action => (
           <button 
             key={action}
-            onClick={() => handleSend(action)}
+            onClick={() => handleSend(action, { isQuickAction: true })}
             className="px-3 py-1.5 bg-white border border-slate-300 rounded-full text-xs font-semibold text-slate-700 hover:bg-amber-50 hover:border-amber-400 hover:text-amber-700 transition-colors"
           >
             {action}
