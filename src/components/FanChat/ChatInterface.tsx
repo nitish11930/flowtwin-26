@@ -32,9 +32,9 @@ type Message = {
 };
 
 function getIncidentButtonLabel(intent?: string) {
-  if (intent === 'medical') return 'Create Code Red Incident';
-  if (intent === 'lost_child') return 'Create Code Amber Incident';
-  return 'Create Incident';
+  if (intent === 'medical') return 'Get medical help';
+  if (intent === 'lost_child') return 'Alert stadium help';
+  return 'Alert staff';
 }
 
 function buildFallbackIncidentDraft(message: Message): IncidentDraft {
@@ -270,7 +270,7 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         sender: 'bot',
-        text: 'I could not create the incident from here. Please notify the nearest usher or security guard now and share the captured details.'
+        text: 'I could not alert staff from here. Please notify the nearest usher or security guard now and share the details shown above.'
       }]);
     }
   };
@@ -331,7 +331,7 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
                   <div className="mt-2 flex flex-wrap items-center gap-2 text-xs font-bold text-red-700">
                     {msg.incidentId ? (
                       <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-emerald-800">
-                        Incident created: {msg.incidentId}
+                        Help request sent to stadium staff.
                       </span>
                     ) : (
                       <>

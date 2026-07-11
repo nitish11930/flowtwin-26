@@ -77,7 +77,8 @@ describe('Shared FlowTwin AI Service', () => {
       const res = await generateAiResponse('fan_navigation', 'my child has lost');
       expect(res.intent).toBe('lost_child');
       expect(res.createIncidentSuggested).toBe(true);
-      expect(res.answer).toContain('Code Amber');
+      expect(res.answer).not.toContain('Code Amber');
+      expect(res.answer.toLowerCase()).toContain('stay exactly where you are');
     });
   });
 
@@ -87,14 +88,15 @@ describe('Shared FlowTwin AI Service', () => {
       const volunteerRes = await generateAiResponse('volunteer_policy', 'A fan says they cannot find their son near Gate C. What should I do?');
 
       expect(fanRes.intent).toBe('lost_child');
-      expect(fanRes.answer).toContain('STAY EXACTLY WHERE YOU ARE');
+      expect(fanRes.answer.toLowerCase()).toContain('stay exactly where you are');
+      expect(fanRes.answer).not.toContain('Code Amber');
       expect(fanRes.answer.toLowerCase()).not.toContain('route');
       expect(volunteerRes.intent).toBe('lost_child');
       expect(volunteerRes.answer).toContain('radio Command Center');
     });
   });
 
-  test('lost child detail follow-up must remain Code Amber and not navigation', async () => {
+  test('lost child detail follow-up stays emergency-safe and not navigation', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse(
         'fan_navigation',
@@ -103,7 +105,8 @@ describe('Shared FlowTwin AI Service', () => {
 
       expect(res.intent).toBe('lost_child');
       expect(res.createIncidentSuggested).toBe(true);
-      expect(res.answer).toContain('Code Amber');
+      expect(res.answer).not.toContain('Code Amber');
+      expect(res.answer).toContain('security team');
       expect(res.capturedDetails.childName).toBe('Sania');
       expect(res.capturedDetails.age).toBe('12');
       expect(res.capturedDetails.clothing).toBe('dark blue shirt');
@@ -115,7 +118,7 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
-  test('full fan lost child report captures Sania details and creates Code Amber draft', async () => {
+  test('full fan lost child report captures Sania details with fan-safe wording', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse(
         'fan_navigation',
@@ -124,7 +127,8 @@ describe('Shared FlowTwin AI Service', () => {
 
       expect(res.intent).toBe('lost_child');
       expect(res.severity).toBe('amber');
-      expect(res.answer).toContain('Code Amber');
+      expect(res.answer).not.toContain('Code Amber');
+      expect(res.answer).toContain('security team');
       expect(res.answer.toLowerCase()).not.toContain('route');
       expect(res.capturedDetails.childName).toBe('Sania');
       expect(res.capturedDetails.age).toBe('12');
@@ -240,7 +244,7 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
-  test('fan persistent history keeps unresolved lost child in Code Amber flow', async () => {
+  test('fan persistent history keeps unresolved lost child in emergency flow', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse(
         'fan_navigation',
@@ -266,10 +270,41 @@ describe('Shared FlowTwin AI Service', () => {
 
       expect(res.intent).toBe('lost_child');
       expect(res.createIncidentSuggested).toBe(true);
-      expect(res.answer).toContain('Code Amber');
+      expect(res.answer).not.toContain('Code Amber');
+      expect(res.answer).toContain('security team');
       expect(res.answer.toLowerCase()).not.toContain('nearest food');
       expect(res.answer.toLowerCase()).not.toContain('route');
       expect(res.memoryState.type).toBe('lost_child');
+    });
+  });
+
+  test('fan emergency acknowledgement does not repeat detail card', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse(
+        'fan_navigation',
+        'great',
+        {
+          chatHistory: [
+            {
+              sender: 'user',
+              text: 'My child Sania is missing. She is 12, wearing a dark blue shirt, last seen at Gate C, contact 9911446670.'
+            },
+            {
+              sender: 'bot',
+              text: 'I have alerted our security team and they are on their way to help you find Sania.',
+              intent: 'lost_child'
+            }
+          ],
+          hasPriorLostChildCard: true
+        }
+      );
+
+      expect(res.intent).toBe('lost_child');
+      expect(res.createIncidentSuggested).toBe(false);
+      expect(res.answer).toContain("I'm here with you");
+      expect(res.answer).not.toContain('Code Amber');
+      expect(res.capturedDetails).toBeUndefined();
+      expect(res.incidentDraft).toBeUndefined();
     });
   });
 
@@ -305,7 +340,8 @@ describe('Shared FlowTwin AI Service', () => {
 
       expect(res.intent).toBe('medical');
       expect(res.severity).toBe('red');
-      expect(res.answer).toContain('Code Red');
+      expect(res.answer).not.toContain('Code Red');
+      expect(res.answer).toContain('stadium medical team');
       expect(res.answer.toLowerCase()).not.toContain('route');
       expect(res.capturedDetails.location).toBe('Gate A');
       expect(res.capturedDetails.symptoms).toBe('headache');
@@ -322,7 +358,8 @@ describe('Shared FlowTwin AI Service', () => {
 
       expect(res.intent).toBe('medical');
       expect(res.severity).toBe('red');
-      expect(res.answer).toContain('Code Red');
+      expect(res.answer).not.toContain('Code Red');
+      expect(res.answer).toContain('stadium medical team');
       expect(res.capturedDetails.location).toBe('Section 105');
       expect(res.capturedDetails.symptoms).toBe('chest pain');
       expect(res.capturedDetails.breathingStatus).toBe('cannot breathe');

@@ -60,7 +60,12 @@ export async function generateAiResponse(
     };
   }
 
-  const safetyResponse = getSafetyCriticalResponse(mode, safetyMessage);
+  const safetyResponse = getSafetyCriticalResponse(mode, safetyMessage, {
+    latestMessage,
+    dynamicContext,
+    extraContext,
+    chatHistory
+  });
   if (safetyResponse) {
     return {
       ...safetyResponse,
@@ -193,7 +198,7 @@ function buildDynamicAiContext(
   const userRole = extraContext?.userRole || getUserRole(mode);
   const personaInstruction = getPersonaInstruction(mode);
   const emergencyInstruction = emergencyState.isActive
-    ? `Ongoing emergency memory: ${emergencyState.type === 'medical' ? 'Code Red medical' : 'Code Amber lost child'} is active in this conversation. Bypass standard routing, food, and small-talk flows until the user clearly resolves it. Continue emergency protocol, ask only for missing critical details, and keep the user anchored to safe next actions.`
+    ? buildEmergencyPersonaInstruction(mode, emergencyState.type)
     : 'No unresolved emergency is active in the current conversation memory.';
 
   const systemInstruction = [
@@ -240,7 +245,12 @@ function getUserRole(mode: AIMode) {
 function getPersonaInstruction(mode: AIMode) {
   switch (mode) {
     case 'fan_navigation':
-      return 'Fan persona rules: be calm, simple, multilingual when needed, privacy-safe, and action-oriented. Do not expose staff workflow details or incident IDs to fans.';
+      return [
+        'Fan persona firewall: speak only as a calm public-facing stadium assistant.',
+        'Never say Code Amber, Code Red, incident draft, dispatch, protocol, Ops Dashboard, captured details, raw policy, or internal staff workflow in the fan-facing answer.',
+        'Translate emergency policy into compassionate plain language: tell the fan what to do now, reassure them that trained stadium staff have been alerted, and protect private contact details.',
+        'For short replies like ok, great, thanks, or got it during an emergency, acknowledge naturally and do not repeat the full emergency summary or detail card.'
+      ].join(' ');
     case 'volunteer_policy':
       return 'Volunteer persona rules: give concise protocol steps, safe escalation contacts, missing-detail checks, privacy reminders, and operational actions for the assigned sector.';
     case 'operations_command':
@@ -343,6 +353,20 @@ function buildOpenAiMessages(chatHistory: ChatHistoryMessage[]) {
   }));
 }
 
+function buildEmergencyPersonaInstruction(mode: AIMode, emergencyType?: EmergencyMemoryState['type']) {
+  if (mode === 'fan_navigation') {
+    const emergencyLabel = emergencyType === 'medical' ? 'urgent medical help' : 'urgent child-help';
+    return [
+      'Ongoing emergency memory: an ' + emergencyLabel + ' situation is active in this fan conversation.',
+      'Bypass standard routing, food, and small-talk flows until the user clearly says it is resolved.',
+      'Use only fan-safe language. Do not mention internal alert names, incident drafts, dispatch, protocols, or dashboards.',
+      'If the latest fan message is only conversational acknowledgement, respond briefly with reassurance and stay available instead of repeating the full summary.'
+    ].join(' ');
+  }
+
+  return `Ongoing emergency memory: ${emergencyType === 'medical' ? 'Code Red medical' : 'Code Amber lost child'} is active in this conversation. Bypass standard routing, food, and small-talk flows until the user clearly resolves it. Continue emergency protocol, ask only for missing critical details, and keep the user anchored to safe next actions.`;
+}
+
 function shouldBypassEmergencyMemory(mode: AIMode, message: string) {
   if (mode !== 'volunteer_policy') return false;
 
@@ -350,12 +374,20 @@ function shouldBypassEmergencyMemory(mode: AIMode, message: string) {
   return ['accessibility', 'crowd', 'directions', 'translate'].includes(quickAction);
 }
 
-function getSafetyCriticalResponse(mode: AIMode, message: string) {
+function getSafetyCriticalResponse(mode: AIMode, message: string, responseContext?: any) {
   if (mode !== 'fan_navigation' && mode !== 'volunteer_policy' && mode !== 'incident_support') {
     return null;
   }
 
   const lowerMsg = message.toLowerCase();
+  const latestLowerMsg = (responseContext?.latestMessage || message).toLowerCase();
+  const isFan = mode === 'fan_navigation';
+  const emergencyType = responseContext?.dynamicContext?.emergencyState?.type;
+
+  if (isFan && responseContext?.dynamicContext?.emergencyState?.isActive && isAcknowledgementOnly(latestLowerMsg)) {
+    return getFanEmergencyAcknowledgement(emergencyType);
+  }
+
   const hasPhoneNumber = /\b\d{7,}\b/.test(lowerMsg);
 
   if (mode === 'volunteer_policy' && lowerMsg.includes('notified security') && lowerMsg.includes('lost child')) {
@@ -403,33 +435,42 @@ function getSafetyCriticalResponse(mode: AIMode, message: string) {
     const capturedSummary = summarizeLostChildDetails(details);
     const locationText = details.lastSeenLocation || 'the last-seen location';
     const missingText = missingDetails.length > 0
-      ? `Missing detail${missingDetails.length === 1 ? '' : 's'}: ${missingDetails.join(', ')}.`
+      ? 'Missing detail' + (missingDetails.length === 1 ? '' : 's') + ': ' + missingDetails.join(', ') + '.'
       : 'All core Code Amber details are captured.';
     const isVolunteer = mode === 'volunteer_policy';
-
-    return {
+    const hasPriorFanCard = Boolean(responseContext?.extraContext?.hasPriorLostChildCard);
+    const baseLostChildResponse: any = {
       intent: 'lost_child',
       severity: 'amber',
       answer: isVolunteer
-        ? `Code Amber active. ${capturedSummary} ${missingText} Proceed to ${locationText} immediately, gather the child's physical description, and radio Command Center. Keep the reporting guardian exactly where they are and do not publicly announce private contact details.`
-        : `Code Amber active. ${capturedSummary} ${missingText} STAY EXACTLY WHERE YOU ARE at ${locationText}. Do not look for the child yourself and do not start walking. Identify the nearest staff member in a yellow vest. I am escalating this to Ops Dashboard with your reported section/location.`,
-      checklist: [
-        isVolunteer ? `Proceed to ${locationText} immediately` : `Stay exactly where you are at ${locationText}`,
-        isVolunteer ? "Gather the child's physical description" : 'Do not look for the child yourself',
-        isVolunteer ? 'Radio Command Center' : 'Identify the nearest staff member in a yellow vest',
+        ? 'Code Amber active. ' + capturedSummary + ' ' + missingText + ' Proceed to ' + locationText + " immediately, gather the child's physical description, and radio Command Center. Keep the reporting guardian exactly where they are and do not publicly announce private contact details."
+        : buildFanLostChildAnswer(details, missingDetails),
+      checklist: isVolunteer ? [
+        'Proceed to ' + locationText + ' immediately',
+        "Gather the child's physical description",
+        'Radio Command Center',
         'Escalate Code Amber to Ops Dashboard'
+      ] : [
+        'Stay exactly where you are at ' + locationText,
+        'Do not leave to search by yourself',
+        'Look for the nearest yellow-vest staff member without moving away',
+        'Keep your phone available for stadium staff'
       ],
-      actions: [
-        isVolunteer ? 'Assign the open incident to yourself' : 'Tap Create Incident',
-        isVolunteer ? 'Proceed to the fan location' : 'Stay in place while staff comes to you',
-        isVolunteer ? 'Radio Command Center' : 'Show this summary to yellow-vest staff',
+      actions: isVolunteer ? [
+        'Assign the open incident to yourself',
+        'Proceed to the fan location',
+        'Radio Command Center',
         'Keep the reporting guardian at the exact location',
         'Update the incident when the missing detail is known'
+      ] : [
+        'Stay exactly where you are',
+        'Keep watching the last-seen area if it is safe',
+        'Tell the nearest yellow-vest staff member these details',
+        'Share any new detail here'
       ],
-      capturedDetails: details,
       requiredDetails: missingDetails,
-      recommendedContact: isVolunteer ? 'Command Center radio channel' : 'Nearest yellow-vest staff member / Ops Dashboard',
-      createIncidentSuggested: true,
+      recommendedContact: isVolunteer ? 'Command Center radio channel' : 'Nearest yellow-vest staff member',
+      createIncidentSuggested: isVolunteer || !hasPriorFanCard,
       incidentDraft: {
         type: 'lost_child',
         sector: 'Fan Copilot',
@@ -439,8 +480,16 @@ function getSafetyCriticalResponse(mode: AIMode, message: string) {
         missingDetails: Object.fromEntries(missingDetails.map(detail => [detail, 'missing']))
       }
     };
-  }
 
+    if (isVolunteer || !hasPriorFanCard) {
+      baseLostChildResponse.capturedDetails = details;
+    } else {
+      delete baseLostChildResponse.incidentDraft;
+      baseLostChildResponse.createIncidentSuggested = false;
+    }
+
+    return baseLostChildResponse;
+  }
   const hasMedicalSignal =
     lowerMsg.includes('medical') ||
     lowerMsg.includes('hurt') ||
@@ -465,22 +514,30 @@ function getSafetyCriticalResponse(mode: AIMode, message: string) {
     const details = extractMedicalDetails(message);
     const missingDetails = getMissingMedicalDetails(details);
     const capturedSummary = summarizeMedicalDetails(details);
-
-    return {
+    const hasPriorFanCard = Boolean(responseContext?.extraContext?.hasPriorMedicalCard);
+    const baseMedicalResponse: any = {
       intent: 'medical',
       severity: 'red',
-      answer: `Code Red active. ${capturedSummary} Dispatch emergency medical services to the section now. Clear the aisles, keep regular traffic away from this sector, and do not move the person unless there is immediate danger.`,
-      checklist: ['Dispatch EMS to the section', 'Clear the aisles', 'Route regular traffic away from this sector', 'Do not move person unless unsafe'],
-      actions: [
+      answer: mode === 'fan_navigation'
+        ? buildFanMedicalAnswer(details, missingDetails)
+        : 'Code Red active. ' + capturedSummary + ' Dispatch emergency medical services to the section now. Clear the aisles, keep regular traffic away from this sector, and do not move the person unless there is immediate danger.',
+      checklist: mode === 'fan_navigation'
+        ? ['Stay with the person if it is safe', 'Keep the aisle clear', 'Do not move them unless there is immediate danger', 'Tell the nearest staff member the exact location']
+        : ['Dispatch EMS to the section', 'Clear the aisles', 'Route regular traffic away from this sector', 'Do not move person unless unsafe'],
+      actions: mode === 'fan_navigation' ? [
+        'Call for the nearest staff member now',
+        'Keep space around the person',
+        'Do not move the person unless unsafe',
+        'Share breathing and consciousness status with staff'
+      ] : [
         mode === 'volunteer_policy' ? 'Mark EMS notified in the incident card' : 'Call emergency medical services now',
         mode === 'volunteer_policy' ? 'Dispatch EMS and guide them to the exact location' : 'Clear the aisle around the person',
         'Do not move the person unless unsafe',
         'Share this medical summary with staff'
       ],
-      capturedDetails: details,
       requiredDetails: missingDetails,
-      recommendedContact: 'First Aid stations at Sections 105, 215, 330',
-      createIncidentSuggested: true,
+      recommendedContact: mode === 'fan_navigation' ? 'Nearest first-aid team or yellow-vest staff member' : 'First Aid stations at Sections 105, 215, 330',
+      createIncidentSuggested: mode !== 'fan_navigation' || !hasPriorFanCard,
       incidentDraft: {
         type: 'medical',
         sector: 'Fan Copilot',
@@ -490,8 +547,16 @@ function getSafetyCriticalResponse(mode: AIMode, message: string) {
         missingDetails: Object.fromEntries(missingDetails.map(detail => [detail, 'missing']))
       }
     };
-  }
 
+    if (mode !== 'fan_navigation' || !hasPriorFanCard) {
+      baseMedicalResponse.capturedDetails = details;
+    } else {
+      delete baseMedicalResponse.incidentDraft;
+      baseMedicalResponse.createIncidentSuggested = false;
+    }
+
+    return baseMedicalResponse;
+  }
   const hasExtremeWeatherSignal =
     lowerMsg.includes('heat stroke') ||
     lowerMsg.includes('too hot') ||
@@ -516,6 +581,43 @@ function getSafetyCriticalResponse(mode: AIMode, message: string) {
   }
 
   return null;
+}
+
+function getFanEmergencyAcknowledgement(emergencyType?: EmergencyMemoryState['type']) {
+  if (emergencyType === 'medical') {
+    return {
+      intent: 'medical',
+      severity: 'red',
+      answer: "I'm here with you. Keep the area clear, do not move the person unless there is immediate danger, and tell me right away if their breathing or consciousness changes.",
+      createIncidentSuggested: false
+    };
+  }
+
+  return {
+    intent: 'lost_child',
+    severity: 'amber',
+    answer: "I'm here with you until help arrives. Stay exactly where you are, keep looking around the last-seen area if it is safe, and tell me right away if you see your child or remember anything new.",
+    createIncidentSuggested: false
+  };
+}
+
+function buildFanLostChildAnswer(details: LostChildDetails, missingDetails: string[]) {
+  const locationText = details.lastSeenLocation || 'your current location';
+  const childText = details.childName ? 'find ' + details.childName : 'find your child';
+  const missingText = missingDetails.length > 0
+    ? ' If you can, send only this missing detail next: ' + missingDetails.join(', ') + '.'
+    : '';
+
+  return 'I know this is incredibly stressful, but please try to stay calm. Stay exactly where you are at ' + locationText + '. Do not leave to search by yourself. I have alerted our security team and they are on their way to help you ' + childText + '. Look for the nearest yellow-vest staff member and show them this chat.' + missingText;
+}
+
+function buildFanMedicalAnswer(details: MedicalDetails, missingDetails: string[]) {
+  const locationText = details.location || 'your exact location';
+  const missingText = missingDetails.length > 0
+    ? ' If you can, tell me: ' + missingDetails.join(', ') + '.'
+    : '';
+
+  return 'This sounds urgent. I have alerted the stadium medical team. Stay at ' + locationText + ', keep the aisle clear, and do not move the person unless there is immediate danger. If they stop breathing or lose consciousness, tell the nearest staff member immediately.' + missingText;
 }
 
 function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?: any) {
@@ -1125,9 +1227,9 @@ function deterministicFallback(mode: AIMode, message: string, extraContext?: any
         return {
           intent: 'lost_child',
           severity: 'amber',
-          answer: 'Code Amber. STAY EXACTLY WHERE YOU ARE. Do not look for the child and do not start walking. Identify the nearest staff member in a yellow vest. I am escalating this to Ops Dashboard with your reported section/location.',
+          answer: 'I know this is incredibly stressful, but please try to stay calm. Stay exactly where you are. Do not leave to search by yourself. I have alerted our security team and they are on their way to help. Identify the nearest staff member in a yellow vest and show them this chat.',
           requiredDetails: ['child name', 'age', 'clothing', 'last seen location', 'time last seen', 'guardian contact'],
-          recommendedContact: 'Nearest yellow-vest staff member / Ops Dashboard',
+          recommendedContact: 'Nearest yellow-vest staff member',
           createIncidentSuggested: true
         };
       }
@@ -1135,7 +1237,7 @@ function deterministicFallback(mode: AIMode, message: string, extraContext?: any
         return {
           intent: 'medical',
           severity: 'red',
-          answer: 'Code Red. Emergency medical services must be dispatched to your section. Clear the aisles, keep other fans away from this sector, and do not move the person unless there is immediate danger.',
+          answer: 'This sounds urgent. I have alerted the stadium medical team. Clear the aisles, keep other fans away, and do not move the person unless there is immediate danger.',
           requiredDetails: ['symptoms', 'location'],
           createIncidentSuggested: true
         };
