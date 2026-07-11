@@ -46,7 +46,8 @@ export async function generateAiResponse(
   const chatHistory = normalizeChatHistory(extraContext?.chatHistory ?? extraContext?.messages);
   const latestMessage = message || getLastUserMessage(chatHistory) || '';
   const dynamicContext = buildDynamicAiContext(mode, latestMessage, chatHistory, extraContext);
-  const safetyMessage = dynamicContext.emergencyState.isActive
+  const bypassEmergencyMemory = shouldBypassEmergencyMemory(mode, latestMessage);
+  const safetyMessage = dynamicContext.emergencyState.isActive && bypassEmergencyMemory === false
     ? buildEmergencyMemoryMessage(latestMessage, chatHistory)
     : latestMessage;
 
@@ -340,6 +341,13 @@ function buildOpenAiMessages(chatHistory: ChatHistoryMessage[]) {
     role: getMessageSpeaker(message) === 'model' ? 'assistant' : 'user',
     content: message.text || ''
   }));
+}
+
+function shouldBypassEmergencyMemory(mode: AIMode, message: string) {
+  if (mode !== 'volunteer_policy') return false;
+
+  const quickAction = normalizeQuickAction(message);
+  return ['accessibility', 'crowd', 'directions', 'translate'].includes(quickAction);
 }
 
 function getSafetyCriticalResponse(mode: AIMode, message: string) {

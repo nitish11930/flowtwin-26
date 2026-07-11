@@ -483,6 +483,36 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
+  test('volunteer accessibility quick action bypasses stale emergency memory', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse(
+        'volunteer_policy',
+        'Accessibility',
+        {
+          chatHistory: [
+            {
+              sender: 'user',
+              text: 'Lost child incident for Sania, age 12, dark blue shirt, last seen Gate C, guardian contact 9911446670.'
+            },
+            {
+              sender: 'bot',
+              text: 'Code Amber active. Notify security and radio Command Center.',
+              intent: 'lost_child'
+            },
+            {
+              sender: 'user',
+              text: 'Accessibility'
+            }
+          ]
+        }
+      );
+
+      expect(res.intent).toBe('accessibility_policy');
+      expect(res.answer).toContain('Accessibility support');
+      expect(res.answer).not.toContain('Code Amber');
+    });
+  });
+
   test('volunteer accessibility quick action gives ADA guidance', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse('volunteer_policy', 'Accessibility');
