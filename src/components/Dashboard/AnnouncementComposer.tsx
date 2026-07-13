@@ -4,14 +4,14 @@ import { CheckCircle2, Loader2, Megaphone, Send } from 'lucide-react';
 import { useSharedState } from '@/lib/store';
 
 export default function AnnouncementComposer() {
-  const { state } = useSharedState();
+  const { state, setSharedState } = useSharedState();
   const [input, setInput] = useState('');
   const [isTranslating, setIsTranslating] = useState(false);
   const [translations, setTranslations] = useState<any>(null);
   const [lastSource, setLastSource] = useState<string | null>(null);
   const lastAutoAnnouncement = useRef<number | undefined>(undefined);
 
-  const translateAnnouncement = async (announcementText: string, source?: string) => {
+  const translateAnnouncement = async (announcementText: string, source?: string, shouldPublish = false) => {
     if (!announcementText.trim()) return;
     setIsTranslating(true);
     setLastSource(source || 'Manual announcement');
@@ -24,6 +24,13 @@ export default function AnnouncementComposer() {
       });
       const data = await response.json();
       setTranslations(data.translations);
+      if (shouldPublish) {
+        setSharedState({
+          announcementDraft: announcementText,
+          announcementSource: source || 'Manual announcement',
+          announcementUpdatedAt: Date.now()
+        });
+      }
     } catch (err) {
       console.error(err);
     } finally {
@@ -37,10 +44,10 @@ export default function AnnouncementComposer() {
 
     lastAutoAnnouncement.current = state.announcementUpdatedAt;
     setInput(state.announcementDraft);
-    translateAnnouncement(state.announcementDraft, state.announcementSource);
+    translateAnnouncement(state.announcementDraft, state.announcementSource, false);
   }, [state.announcementDraft, state.announcementSource, state.announcementUpdatedAt]);
 
-  const handleTranslate = () => translateAnnouncement(input, 'Manual announcement');
+  const handleTranslate = () => translateAnnouncement(input, 'Manual announcement', true);
 
   return (
     <section className="bg-slate-800 rounded-2xl border border-slate-700 p-6 shadow-lg" aria-labelledby="announcement-composer-heading">

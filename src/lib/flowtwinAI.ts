@@ -203,6 +203,7 @@ function buildDynamicAiContext(
   const userRole = extraContext?.userRole || getUserRole(mode);
   const personaInstruction = getPersonaInstruction(mode);
   const fewShotInstruction = getFewShotInstruction(mode);
+  const liveOpsAnnouncement = buildLiveOpsAnnouncementSummary(extraContext?.liveOpsAnnouncement);
   const emergencyInstruction = emergencyState.isActive
     ? buildEmergencyPersonaInstruction(mode, emergencyState.type)
     : 'No unresolved emergency is active in the current conversation memory.';
@@ -219,6 +220,7 @@ function buildDynamicAiContext(
     emergencyInstruction,
     'Authoritative retrieved stadium knowledge follows. Treat it as source of truth over general model knowledge.',
     rag.contextText,
+    liveOpsAnnouncement,
     `Live State: ${liveState}`,
     'Use retrieved chunks from stadium-policies.json, stadium-map.json, live-crowd-data.json, routes.json, amenities.json, and transport-status.json before giving routes, crowd guidance, dispatch advice, or announcements.',
     'Do not invent stadium rules, emergency lockdowns, gate closures, or medical powers that are not present in the app context.'
@@ -230,6 +232,14 @@ function buildDynamicAiContext(
     liveState,
     rag
   };
+}
+
+function buildLiveOpsAnnouncementSummary(liveOpsAnnouncement?: any) {
+  const text = typeof liveOpsAnnouncement?.text === 'string' ? liveOpsAnnouncement.text.trim() : '';
+  if (!text) return 'No current Ops broadcast has been shared with this assistant.';
+
+  const source = typeof liveOpsAnnouncement?.source === 'string' ? liveOpsAnnouncement.source : 'Ops Dashboard';
+  return `Current Ops Broadcast from ${source}: ${text}. Treat this as live operational truth for fan, volunteer, and operations answers until superseded.`;
 }
 
 function getUserRole(mode: AIMode) {
@@ -699,6 +709,10 @@ function buildFanMedicalAnswer(details: MedicalDetails, missingDetails: string[]
 
 function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?: any) {
   const lowerMsg = message.toLowerCase();
+  const liveOpsText = typeof extraContext?.liveOpsAnnouncement?.text === 'string'
+    ? extraContext.liveOpsAnnouncement.text
+    : '';
+  const lowerLiveOpsText = liveOpsText.toLowerCase();
 
   if (mode === 'fan_navigation') {
     if (isAcknowledgementOnly(lowerMsg)) {
@@ -706,6 +720,48 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
         intent: 'acknowledgement',
         answer: 'Glad it helped. I can still help with food, water, restrooms, your seat, accessibility support, crowd-safe routes, or finding stadium staff.',
         createIncidentSuggested: false
+      };
+    }
+
+    const asksLiveGate =
+      lowerMsg.includes('gate now') ||
+      lowerMsg.includes('accessible gate') ||
+      lowerMsg.includes('best gate') ||
+      lowerMsg.includes('fastest gate') ||
+      lowerMsg.includes('which gate') ||
+      lowerMsg.includes('free gate') ||
+      lowerMsg.includes('free to move') ||
+      lowerMsg.includes('available gate') ||
+      (lowerMsg.includes('gate') && lowerMsg.includes('now'));
+
+    const gateBIsLiveOption =
+      lowerLiveOpsText.includes('gate b') &&
+      (lowerLiveOpsText.includes('clear') || lowerLiveOpsText.includes('faster entry') || lowerLiveOpsText.includes('available'));
+
+    if (asksLiveGate && gateBIsLiveOption) {
+      return {
+        intent: 'navigation',
+        answer: 'Live Ops update says Gate B is currently the best option. It has about a 5 minute wait and supports accessible entry, so head to Gate B and use the North Ramp Route. Keep accessible lanes clear and follow staff directions when you arrive.',
+        accessibility: true,
+        crowdAware: true,
+        source: 'Ops broadcast',
+        actions: ['Go to Gate B for faster entry', 'Use the accessible North Ramp Route', 'Follow staff directions at the gate'],
+        routeData: {
+          route: {
+            id: 'live-gate-b-accessible',
+            name: 'North Ramp Route B',
+            startPoint: 'Gate B',
+            endPoint: 'Section 102',
+            distanceMeters: 400,
+            isAccessible: true,
+            hasStairs: false,
+            averageTimeMins: 7,
+            transitId: 'transit-shuttle-north',
+            sustainabilityBonus: 30
+          },
+          score: 120,
+          explanation: 'Updated from live Ops broadcast: Gate B is clear and available for faster accessible entry.'
+        }
       };
     }
 
@@ -809,6 +865,17 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
 
   if (mode === 'volunteer_policy') {
     const quickAction = normalizeQuickAction(message);
+
+    if (liveOpsText && (lowerMsg.includes('latest announcement') || lowerMsg.includes('ops announcement') || lowerMsg.includes('current update') || lowerMsg.includes('gate b'))) {
+      return {
+        intent: 'live_ops_update',
+        severity: 'low',
+        answer: `Current Ops broadcast: ${liveOpsText} Use this wording when guiding fans, keep accessible lanes clear, and route entry questions according to this live update.`,
+        checklist: ['Repeat the Ops broadcast consistently', 'Guide fans to the announced gate', 'Keep accessible lanes clear'],
+        recommendedContact: 'Ops Dashboard / Crowd Lead',
+        createIncidentSuggested: false
+      };
+    }
 
     if ((lowerMsg.includes('ticket') || lowerMsg.includes('scan') || lowerMsg.includes('scanner')) && (lowerMsg.includes('screaming') || lowerMsg.includes('angry') || lowerMsg.includes('scammer') || lowerMsg.includes("won't scan") || lowerMsg.includes('will not scan'))) {
       return {

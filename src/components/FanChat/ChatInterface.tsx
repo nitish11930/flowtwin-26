@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Send, User, Bot, Loader2 } from 'lucide-react';
 import SmartRouteCard from './SmartRouteCard';
 import AmenityCard from './AmenityCard';
@@ -29,6 +29,12 @@ type Message = {
   incidentDraft?: IncidentDraft;
   incidentId?: string;
   orderId?: string;
+};
+
+type LiveOpsAnnouncement = {
+  text: string;
+  source?: string;
+  updatedAt?: number;
 };
 
 function getIncidentButtonLabel(intent?: string) {
@@ -116,13 +122,14 @@ function persistStoredMessages(messages: Message[]) {
   }));
 }
 
-export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: boolean }) {
+export default function ChatInterface({ gateCSurgeActive, liveOpsAnnouncement }: { gateCSurgeActive: boolean; liveOpsAnnouncement?: LiveOpsAnnouncement }) {
   const [messages, setMessages] = useState<Message[]>(loadStoredMessages);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
   const [orderingMessageId, setOrderingMessageId] = useState<string | null>(null);
   const [lastInput, setLastInput] = useState('');
   const [hasSearched, setHasSearched] = useState(false);
+  const lastOpsUpdateRef = useRef<number | undefined>(undefined);
 
   useEffect(() => {
     persistStoredMessages(messages);
@@ -159,6 +166,22 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [gateCSurgeActive]);
 
+  useEffect(() => {
+    if (!liveOpsAnnouncement?.text || !liveOpsAnnouncement.updatedAt) return;
+    if (lastOpsUpdateRef.current === liveOpsAnnouncement.updatedAt) return;
+
+    lastOpsUpdateRef.current = liveOpsAnnouncement.updatedAt;
+    setMessages(prev => [
+      ...prev,
+      {
+        id: `ops-${liveOpsAnnouncement.updatedAt}`,
+        sender: 'bot',
+        text: `Live stadium update${liveOpsAnnouncement.source ? ` from ${liveOpsAnnouncement.source}` : ''}: ${liveOpsAnnouncement.text}`,
+        intent: 'live_ops_update'
+      }
+    ]);
+  }, [liveOpsAnnouncement?.text, liveOpsAnnouncement?.source, liveOpsAnnouncement?.updatedAt]);
+
   const callChatApi = async (messageText: string, isUpdate = false, chatHistory: Message[] = messages) => {
     setIsTyping(true);
     
@@ -167,7 +190,7 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
       const aiResponse = await fetch('/api/fan-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userMessage: messageText, messages: chatHistory, gateCSurgeActive })
+        body: JSON.stringify({ userMessage: messageText, messages: chatHistory, gateCSurgeActive, liveOpsAnnouncement })
       });
       const aiData = await aiResponse.json();
       const widgetData = aiData.widgetData;

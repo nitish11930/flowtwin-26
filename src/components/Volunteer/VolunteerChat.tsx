@@ -1,6 +1,7 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
 import { Send, User, Bot, Loader2, AlertCircle, Phone, CheckSquare } from 'lucide-react';
+import { useSharedState } from '@/lib/store';
 
 type Message = {
   id: string;
@@ -61,6 +62,7 @@ function persistStoredMessages(messages: Message[]) {
 }
 
 export default function VolunteerChat() {
+  const { state } = useSharedState();
   const [messages, setMessages] = useState<Message[]>(loadStoredMessages);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -122,7 +124,12 @@ export default function VolunteerChat() {
           isQuickAction,
           volunteerId: 'vol-123',
           sector: 'Sector 102',
-          language: 'en'
+          language: 'en',
+          liveOpsAnnouncement: state.announcementDraft ? {
+            text: state.announcementDraft,
+            source: state.announcementSource,
+            updatedAt: state.announcementUpdatedAt
+          } : undefined
         })
       });
       const data = await response.json();

@@ -16,7 +16,7 @@ type FanChatMessage = {
 
 export async function POST(req: Request) {
   try {
-    const { userMessage, messages = [], gateCSurgeActive = false } = await req.json();
+    const { userMessage, messages = [], gateCSurgeActive = false, liveOpsAnnouncement } = await req.json();
     const chatHistory = Array.isArray(messages) ? messages : [];
     const intent = await classifyUniversalIntent(userMessage || '', 'fan');
 
@@ -29,6 +29,7 @@ export async function POST(req: Request) {
       chatHistory,
       userRole: 'You are speaking to a stadium Fan.',
       fanPersonaFirewall: true,
+      liveOpsAnnouncement,
       hasPriorLostChildCard: hasPriorEmergencyCard(chatHistory, 'lost_child'),
       hasPriorMedicalCard: hasPriorEmergencyCard(chatHistory, 'medical')
     });

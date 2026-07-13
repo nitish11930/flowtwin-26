@@ -244,6 +244,25 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
+  test('fan uses live Ops Gate B announcement for accessible gate now', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('fan_navigation', 'accessible gate now', {
+        liveOpsAnnouncement: {
+          text: 'Gate B is currently clear with an estimated 5 minute wait. Fans may move to Gate B for faster entry. Please keep accessible lanes clear and follow staff directions.',
+          source: 'Gate B',
+          updatedAt: Date.now()
+        }
+      });
+
+      expect(res.intent).toBe('navigation');
+      expect(res.answer).toContain('Gate B');
+      expect(res.answer).toContain('Live Ops update');
+      expect(res.accessibility).toBe(true);
+      expect(res.routeData.route.startPoint).toBe('Gate B');
+      expect(res.routeData.route.isAccessible).toBe(true);
+    });
+  });
+
   test('fan collapsed bathroom panic triggers medical help instead of navigation', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse('fan_navigation', 'Someone just collapsed in the bathroom near Gate B! What do I do?');
@@ -629,6 +648,22 @@ describe('Shared FlowTwin AI Service', () => {
       expect(res.answer).toContain('food stalls');
       expect(res.answer).not.toContain('Code Amber');
       expect(res.memoryState?.type).not.toBe('lost_child');
+    });
+  });
+
+  test('volunteer can repeat current Ops broadcast context', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('volunteer_policy', 'What is the latest announcement for Gate B?', {
+        liveOpsAnnouncement: {
+          text: 'Gate B is currently clear with an estimated 5 minute wait. Fans may move to Gate B for faster entry.',
+          source: 'Gate B',
+          updatedAt: Date.now()
+        }
+      });
+
+      expect(res.intent).toBe('live_ops_update');
+      expect(res.answer).toContain('Gate B is currently clear');
+      expect(res.checklist).toContain('Guide fans to the announced gate');
     });
   });
 
