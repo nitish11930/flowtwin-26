@@ -166,7 +166,7 @@ function buildFanMedicalAnswer(details: Record<string, string> = {}, requiredDet
     ? ' If you can, tell me: ' + requiredDetails.join(', ') + '.'
     : '';
 
-  return 'This sounds urgent. I have alerted the stadium medical team. Stay at ' + locationText + ', keep the aisle clear, and do not move the person unless there is immediate danger. If they stop breathing or lose consciousness, tell the nearest staff member immediately.' + missingText;
+  return 'Listen to me carefully: stay calm and stay right where you are at ' + locationText + '. I have alerted the stadium medical team and they are on their way. Do not move the person unless there is immediate danger. Keep the area clear, and if there is a yellow-vest steward nearby, wave them down now. If they stop breathing or lose consciousness, tell the nearest staff member immediately.' + missingText;
 }
 
 function sanitizeStringList(value: unknown) {

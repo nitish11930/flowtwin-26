@@ -1444,7 +1444,7 @@ function deterministicFallback(mode: AIMode, message: string, extraContext?: any
         return {
           intent: 'medical',
           severity: 'red',
-          answer: 'This sounds urgent. I have alerted the stadium medical team. Clear the aisles, keep other fans away, and do not move the person unless there is immediate danger.',
+          answer: 'Listen to me carefully: stay calm and stay right where you are. I have alerted the stadium medical team and they are on their way. Do not move the person unless there is immediate danger. Keep the area clear, and wave down a yellow-vest steward if one is nearby.',
           requiredDetails: ['symptoms', 'location'],
           createIncidentSuggested: true
         };
