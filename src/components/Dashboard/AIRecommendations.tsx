@@ -23,7 +23,10 @@ export default function AIRecommendations() {
         const response = await fetch('/api/ops-recommendation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: 'Gate C is surging. Generate action plan for rerouting fans and public announcements.' })
+          body: JSON.stringify({
+            message: 'Gate C is surging. Generate action plan for rerouting fans and public announcements.',
+            stadiumKnowledge: state.stadiumKnowledge
+          })
         });
         const data = await response.json();
         setRecommendation(data.text || data.widgetData?.actionPlan || 'All clear. Standard operations.');
@@ -38,7 +41,7 @@ export default function AIRecommendations() {
     };
     
     fetchRecommendations();
-  }, [state.gateCSurgeActive]);
+  }, [state.gateCSurgeActive, state.stadiumKnowledge]);
 
   return (
     <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 flex flex-col h-full shadow-lg transition-colors duration-500">

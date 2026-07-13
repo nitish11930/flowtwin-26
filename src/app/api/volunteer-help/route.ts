@@ -5,7 +5,7 @@ import { buildConversationalResponse, classifyUniversalIntent, toChatPayload } f
 
 export async function POST(req: Request) {
   try {
-    const { question, message, messages = [], sector, volunteerId, language, liveOpsAnnouncement } = await req.json();
+    const { question, message, messages = [], sector, volunteerId, language, liveOpsAnnouncement, stadiumKnowledge = [] } = await req.json();
     const userMessage = message || question || '';
     const chatHistory = Array.isArray(messages) ? messages : [];
     const intent = await classifyUniversalIntent(userMessage, 'volunteer');
@@ -21,6 +21,7 @@ export async function POST(req: Request) {
       sector,
       language,
       liveOpsAnnouncement,
+      stadiumKnowledge,
       userRole: `You are guiding a ${sector || 'Sector'} Volunteer.`,
       openIncidents: store.getIncidents().filter(incident => incident.status !== 'resolved')
     });

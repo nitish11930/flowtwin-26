@@ -46,6 +46,7 @@ export default function FanPage() {
             source: state.announcementSource,
             updatedAt: state.announcementUpdatedAt
           } : undefined}
+          stadiumKnowledge={state.stadiumKnowledge}
         />
       </main>
     </div>

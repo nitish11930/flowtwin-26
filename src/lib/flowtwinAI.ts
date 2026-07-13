@@ -38,6 +38,16 @@ type MedicalDetails = {
   breathingStatus?: string;
 };
 
+type StadiumKnowledgeEntry = {
+  id?: string;
+  category?: string;
+  title?: string;
+  detail?: string;
+  location?: string;
+  status?: string;
+  updatedAt?: number;
+};
+
 export async function generateAiResponse(
   mode: AIMode,
   message: string,
@@ -204,6 +214,7 @@ function buildDynamicAiContext(
   const personaInstruction = getPersonaInstruction(mode);
   const fewShotInstruction = getFewShotInstruction(mode);
   const liveOpsAnnouncement = buildLiveOpsAnnouncementSummary(extraContext?.liveOpsAnnouncement);
+  const liveKnowledge = buildLiveKnowledgeSummary(extraContext?.stadiumKnowledge);
   const emergencyInstruction = emergencyState.isActive
     ? buildEmergencyPersonaInstruction(mode, emergencyState.type)
     : 'No unresolved emergency is active in the current conversation memory.';
@@ -221,6 +232,7 @@ function buildDynamicAiContext(
     'Authoritative retrieved stadium knowledge follows. Treat it as source of truth over general model knowledge.',
     rag.contextText,
     liveOpsAnnouncement,
+    liveKnowledge,
     `Live State: ${liveState}`,
     'Use retrieved chunks from stadium-policies.json, stadium-map.json, live-crowd-data.json, routes.json, amenities.json, and transport-status.json before giving routes, crowd guidance, dispatch advice, or announcements.',
     'Do not invent stadium rules, emergency lockdowns, gate closures, or medical powers that are not present in the app context.'
@@ -240,6 +252,24 @@ function buildLiveOpsAnnouncementSummary(liveOpsAnnouncement?: any) {
 
   const source = typeof liveOpsAnnouncement?.source === 'string' ? liveOpsAnnouncement.source : 'Ops Dashboard';
   return `Current Ops Broadcast from ${source}: ${text}. Treat this as live operational truth for fan, volunteer, and operations answers until superseded.`;
+}
+
+function normalizeKnowledgeEntries(entries?: any): StadiumKnowledgeEntry[] {
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .filter((entry): entry is StadiumKnowledgeEntry => Boolean(entry) && typeof entry.detail === 'string' && typeof entry.title === 'string')
+    .slice(0, 30);
+}
+
+function buildLiveKnowledgeSummary(entries?: any) {
+  const normalized = normalizeKnowledgeEntries(entries);
+  if (normalized.length === 0) return 'No editable Stadium Knowledge Store entries are currently active.';
+
+  const lines = normalized.slice(0, 12).map((entry) => (
+    `- [${entry.category || 'general'}] ${entry.title}${entry.location ? ` @ ${entry.location}` : ''}${entry.status ? ` (${entry.status})` : ''}: ${entry.detail}`
+  ));
+
+  return ['Editable Stadium Knowledge Store entries from Ops Dashboard:', ...lines].join('\n');
 }
 
 function getUserRole(mode: AIMode) {
@@ -707,12 +737,104 @@ function buildFanMedicalAnswer(details: MedicalDetails, missingDetails: string[]
   return 'Listen to me carefully: stay calm and stay right where you are at ' + locationText + '. I have alerted the stadium medical team and they are on their way. Do not move the person unless there is immediate danger. Keep the area clear, and if there is a yellow-vest steward nearby, wave them down now. If they stop breathing or lose consciousness, tell the nearest staff member immediately.' + missingText;
 }
 
+function findBestKnowledgeEntry(message: string, entries?: any): StadiumKnowledgeEntry | null {
+  const normalized = normalizeKnowledgeEntries(entries);
+  if (normalized.length === 0) return null;
+
+  const queryTokens = tokenizeKnowledgeText(message);
+  if (queryTokens.length === 0) return null;
+
+  const scored = normalized.map((entry) => {
+    const haystack = [entry.category, entry.title, entry.location, entry.status, entry.detail].filter(Boolean).join(' ');
+    const entryTokens = tokenizeKnowledgeText(haystack);
+    let score = 0;
+
+    for (const token of queryTokens) {
+      if (entryTokens.includes(token)) score += 2;
+      if ((entry.title || '').toLowerCase().includes(token)) score += 2;
+      if ((entry.location || '').toLowerCase().includes(token)) score += 2;
+      if ((entry.category || '').toLowerCase().includes(token)) score += 1;
+    }
+
+    if (/delay|delayed|late|train|metro|shuttle|transport/i.test(message) && entry.category === 'transport') score += 4;
+    if (/accessible|accessibility|wheelchair|mobility|shuttle/i.test(message) && entry.category === 'accessibility') score += 4;
+    if (/security|bag|policy|rule|allowed|not allowed/i.test(message) && (entry.category === 'security' || entry.category === 'policy')) score += 4;
+    if (/food|drink|water|stall|restroom/i.test(message) && entry.category === 'amenity') score += 4;
+
+    return { entry, score };
+  }).sort((a, b) => b.score - a.score);
+
+  return scored[0]?.score >= 4 ? scored[0].entry : null;
+}
+
+function tokenizeKnowledgeText(text: string) {
+  const stopWords = new Set(['the', 'is', 'are', 'a', 'an', 'to', 'for', 'of', 'and', 'or', 'in', 'on', 'at', 'now', 'what', 'where', 'which', 'tell', 'me', 'about', 'can', 'i']);
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .split(/\s+/)
+    .filter(token => token.length > 1 && !stopWords.has(token));
+}
+
+function buildKnowledgeResponse(mode: AIMode, entry: StadiumKnowledgeEntry) {
+  const locationText = entry.location ? ` Location: ${entry.location}.` : '';
+  const statusText = entry.status ? ` Current status: ${entry.status}.` : '';
+
+  if (mode === 'fan_navigation') {
+    return {
+      intent: 'knowledge_lookup',
+      answer: `Current stadium update: ${entry.detail}${locationText}${statusText}`,
+      source: 'stadium_knowledge_store',
+      knowledgeData: entry,
+      actions: buildKnowledgeActions(entry)
+    };
+  }
+
+  if (mode === 'volunteer_policy') {
+    return {
+      intent: 'knowledge_lookup',
+      severity: entry.category === 'security' ? 'high' : 'low',
+      answer: `Ops Knowledge Store entry: ${entry.title}. ${entry.detail}${locationText}${statusText}`,
+      checklist: buildKnowledgeActions(entry),
+      recommendedContact: entry.category === 'security' ? 'Security Command / Ops Dashboard' : 'Ops Dashboard',
+      createIncidentSuggested: false,
+      knowledgeData: entry
+    };
+  }
+
+  return {
+    recommendations: [
+      {
+        type: 'knowledge_lookup',
+        title: entry.title || 'Knowledge Store Entry',
+        description: `${entry.detail}${locationText}${statusText}`,
+        priority: entry.category === 'security' ? 'high' : 'medium'
+      }
+    ],
+    knowledgeData: entry
+  };
+}
+
+function buildKnowledgeActions(entry: StadiumKnowledgeEntry) {
+  const actions = ['Use this live Ops knowledge as the current source of truth'];
+  if (entry.location) actions.push(`Guide people using location: ${entry.location}`);
+  if (entry.status) actions.push(`Mention status: ${entry.status}`);
+  if (entry.category === 'security') actions.push('Escalate uncertainty to Security Command');
+  if (entry.category === 'accessibility') actions.push('Preserve accessible lanes and offer step-free support');
+  return actions;
+}
+
 function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?: any) {
   const lowerMsg = message.toLowerCase();
   const liveOpsText = typeof extraContext?.liveOpsAnnouncement?.text === 'string'
     ? extraContext.liveOpsAnnouncement.text
     : '';
   const lowerLiveOpsText = liveOpsText.toLowerCase();
+  const matchingKnowledge = findBestKnowledgeEntry(message, extraContext?.stadiumKnowledge);
+
+  if (matchingKnowledge && (mode === 'fan_navigation' || mode === 'volunteer_policy' || mode === 'operations_command')) {
+    return buildKnowledgeResponse(mode, matchingKnowledge);
+  }
 
   if (mode === 'fan_navigation') {
     if (isAcknowledgementOnly(lowerMsg)) {

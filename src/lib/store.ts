@@ -8,17 +8,36 @@ export type SharedState = {
   announcementDraft?: string;
   announcementSource?: string;
   announcementUpdatedAt?: number;
+  stadiumKnowledge: StadiumKnowledgeEntry[];
+};
+
+export type StadiumKnowledgeCategory = 'transport' | 'accessibility' | 'security' | 'policy' | 'amenity' | 'operations' | 'sustainability';
+
+export type StadiumKnowledgeEntry = {
+  id: string;
+  category: StadiumKnowledgeCategory;
+  title: string;
+  detail: string;
+  location?: string;
+  status?: string;
+  updatedAt: number;
 };
 
 const defaultState: SharedState = {
   gateCSurgeActive: false,
+  stadiumKnowledge: [],
 };
 
 function parseStoredState(value: string | null): SharedState {
   if (!value) return defaultState;
 
   try {
-    return { ...defaultState, ...JSON.parse(value) };
+    const parsed = JSON.parse(value);
+    return {
+      ...defaultState,
+      ...parsed,
+      stadiumKnowledge: Array.isArray(parsed?.stadiumKnowledge) ? parsed.stadiumKnowledge : []
+    };
   } catch {
     return defaultState;
   }

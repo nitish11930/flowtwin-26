@@ -4,6 +4,7 @@ import StadiumHeatMap from '@/components/Dashboard/StadiumHeatMap';
 import MetricsPanel from '@/components/Dashboard/MetricsPanel';
 import AIRecommendations from '@/components/Dashboard/AIRecommendations';
 import AnnouncementComposer from '@/components/Dashboard/AnnouncementComposer';
+import StadiumKnowledgeStore from '@/components/Dashboard/StadiumKnowledgeStore';
 
 export default function OpsDashboard() {
   return (
@@ -32,6 +33,7 @@ export default function OpsDashboard() {
         {/* Left Column - Heat Map (spans 2 cols on large screens) */}
         <div className="lg:col-span-2 flex flex-col gap-6">
           <StadiumHeatMap />
+          <StadiumKnowledgeStore />
           <AnnouncementComposer />
         </div>
         

@@ -7,6 +7,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const message = body.message || body.question || 'Analyze operations context and generate action plan';
     const messages = Array.isArray(body.messages) ? body.messages : [];
+    const stadiumKnowledge = Array.isArray(body.stadiumKnowledge) ? body.stadiumKnowledge : [];
     const intent = await classifyUniversalIntent(message, 'ops');
 
     if (intent === 'CONVERSATIONAL') {
@@ -16,6 +17,7 @@ export async function POST(req: Request) {
 
     const response = await generateAiResponse('operations_command', message, {
       chatHistory: messages,
+      stadiumKnowledge,
       userRole: 'You are advising an Operations Organizer.'
     });
     

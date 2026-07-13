@@ -129,7 +129,8 @@ export default function VolunteerChat() {
             text: state.announcementDraft,
             source: state.announcementSource,
             updatedAt: state.announcementUpdatedAt
-          } : undefined
+          } : undefined,
+          stadiumKnowledge: state.stadiumKnowledge
         })
       });
       const data = await response.json();

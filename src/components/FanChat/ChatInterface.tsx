@@ -5,6 +5,7 @@ import SmartRouteCard from './SmartRouteCard';
 import AmenityCard from './AmenityCard';
 import { RouteScoreResult } from '@/lib/routingEngine';
 import type { AmenityRecommendation } from '@/lib/amenityEngine';
+import type { StadiumKnowledgeEntry } from '@/lib/store';
 
 type IncidentDraft = {
   type: string;
@@ -122,7 +123,7 @@ function persistStoredMessages(messages: Message[]) {
   }));
 }
 
-export default function ChatInterface({ gateCSurgeActive, liveOpsAnnouncement }: { gateCSurgeActive: boolean; liveOpsAnnouncement?: LiveOpsAnnouncement }) {
+export default function ChatInterface({ gateCSurgeActive, liveOpsAnnouncement, stadiumKnowledge = [] }: { gateCSurgeActive: boolean; liveOpsAnnouncement?: LiveOpsAnnouncement; stadiumKnowledge?: StadiumKnowledgeEntry[] }) {
   const [messages, setMessages] = useState<Message[]>(loadStoredMessages);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
@@ -190,7 +191,7 @@ export default function ChatInterface({ gateCSurgeActive, liveOpsAnnouncement }:
       const aiResponse = await fetch('/api/fan-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userMessage: messageText, messages: chatHistory, gateCSurgeActive, liveOpsAnnouncement })
+        body: JSON.stringify({ userMessage: messageText, messages: chatHistory, gateCSurgeActive, liveOpsAnnouncement, stadiumKnowledge })
       });
       const aiData = await aiResponse.json();
       const widgetData = aiData.widgetData;

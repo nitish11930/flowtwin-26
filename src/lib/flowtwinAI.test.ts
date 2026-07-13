@@ -263,6 +263,51 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
+  test('fan answers train delay from editable stadium knowledge store', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('fan_navigation', 'Is the train delayed right now?', {
+        stadiumKnowledge: [
+          {
+            id: 'knowledge-train-delay',
+            category: 'transport',
+            title: 'Metro Line 1 delay',
+            location: 'Metro Line 1',
+            status: 'Delayed 15 min',
+            detail: 'Metro Line 1 is delayed by 15 minutes. Fans should use shuttle backup if they are in a hurry.',
+            updatedAt: Date.now()
+          }
+        ]
+      });
+
+      expect(res.intent).toBe('knowledge_lookup');
+      expect(res.answer).toContain('Metro Line 1 is delayed by 15 minutes');
+      expect(res.answer).toContain('Current stadium update');
+      expect(res.knowledgeData.category).toBe('transport');
+    });
+  });
+
+  test('fan answers accessible shuttle gate from editable stadium knowledge store', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('fan_navigation', 'Where is accessible shuttle pickup?', {
+        stadiumKnowledge: [
+          {
+            id: 'knowledge-access-shuttle',
+            category: 'accessibility',
+            title: 'Accessible shuttle gate',
+            location: 'Gate C',
+            status: 'Active',
+            detail: 'Accessible shuttle pickup is currently at Gate C. Use step-free access lanes and ask mobility volunteers for shuttle boarding help.',
+            updatedAt: Date.now()
+          }
+        ]
+      });
+
+      expect(res.intent).toBe('knowledge_lookup');
+      expect(res.answer).toContain('Gate C');
+      expect(res.actions).toContain('Preserve accessible lanes and offer step-free support');
+    });
+  });
+
   test('fan collapsed bathroom panic triggers medical help instead of navigation', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse('fan_navigation', 'Someone just collapsed in the bathroom near Gate B! What do I do?');
@@ -664,6 +709,28 @@ describe('Shared FlowTwin AI Service', () => {
       expect(res.intent).toBe('live_ops_update');
       expect(res.answer).toContain('Gate B is currently clear');
       expect(res.checklist).toContain('Guide fans to the announced gate');
+    });
+  });
+
+  test('volunteer answers security policy from editable knowledge store', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('volunteer_policy', 'What is the backpack security policy?', {
+        stadiumKnowledge: [
+          {
+            id: 'knowledge-bag-policy',
+            category: 'security',
+            title: 'Bag check policy',
+            location: 'All gates',
+            status: 'Active',
+            detail: 'Large backpacks are not allowed through entry gates. Direct fans to bag-check support before they enter the queue.',
+            updatedAt: Date.now()
+          }
+        ]
+      });
+
+      expect(res.intent).toBe('knowledge_lookup');
+      expect(res.answer).toContain('Large backpacks are not allowed');
+      expect(res.recommendedContact).toContain('Security Command');
     });
   });
 
