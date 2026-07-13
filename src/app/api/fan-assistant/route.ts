@@ -1,5 +1,7 @@
 import { NextResponse } from 'next/server';
 import { generateAiResponse } from '../../../lib/flowtwinAI';
+import { calculateBestRoute } from '@/lib/routingEngine';
+import { buildConversationalResponse, classifyUniversalIntent, toChatPayload } from '@/lib/globalIntent';
 
 type FanChatMessage = {
   sender?: string;
@@ -14,8 +16,14 @@ type FanChatMessage = {
 
 export async function POST(req: Request) {
   try {
-    const { userMessage, messages = [] } = await req.json();
+    const { userMessage, messages = [], gateCSurgeActive = false } = await req.json();
     const chatHistory = Array.isArray(messages) ? messages : [];
+    const intent = await classifyUniversalIntent(userMessage || '', 'fan');
+
+    if (intent === 'CONVERSATIONAL') {
+      const text = await buildConversationalResponse('fan', userMessage || '', chatHistory);
+      return NextResponse.json(toChatPayload(text));
+    }
 
     const response = await generateAiResponse('fan_navigation', userMessage, {
       chatHistory,
@@ -24,11 +32,33 @@ export async function POST(req: Request) {
       hasPriorLostChildCard: hasPriorEmergencyCard(chatHistory, 'lost_child'),
       hasPriorMedicalCard: hasPriorEmergencyCard(chatHistory, 'medical')
     });
+    const safeResponse = applyFanPersonaFirewall(response, userMessage, chatHistory);
+    const widgetData = buildFanWidgetData(safeResponse, userMessage, gateCSurgeActive);
 
-    return NextResponse.json(applyFanPersonaFirewall(response, userMessage, chatHistory));
+    return NextResponse.json(toChatPayload(safeResponse.answer || safeResponse.text || 'I can help with that.', widgetData));
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+}
+
+function buildFanWidgetData(response: any, userMessage: string, gateCSurgeActive: boolean) {
+  if (!response || typeof response !== 'object') return undefined;
+  const widgetData = { ...response };
+
+  if (response.intent === 'navigation' && !response.routeData) {
+    const needsAccess =
+      Boolean(response.accessibility) ||
+      /accessible|wheelchair|mobility|step-free/i.test(userMessage || '');
+    const routeResult = calculateBestRoute({ requiresAccessibility: needsAccess }, gateCSurgeActive);
+    if (routeResult) {
+      widgetData.routeData = {
+        ...routeResult,
+        explanation: response.answer || ''
+      };
+    }
+  }
+
+  return widgetData;
 }
 
 function hasPriorEmergencyCard(messages: FanChatMessage[], intent: 'lost_child' | 'medical') {

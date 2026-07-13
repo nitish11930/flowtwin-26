@@ -13,9 +13,13 @@ export default function AIRecommendations() {
     const fetchRecommendations = async () => {
       setIsLoading(true);
       try {
-        const response = await fetch('/api/ops-recommendation', { method: 'POST' });
+        const response = await fetch('/api/ops-recommendation', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: 'Analyze operations context and generate action plan' })
+        });
         const data = await response.json();
-        setRecommendation(data.actionPlan);
+        setRecommendation(data.text || data.widgetData?.actionPlan || 'All clear. Standard operations.');
       } catch (e) {
         console.error(e);
       } finally {

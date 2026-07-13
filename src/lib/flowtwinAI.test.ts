@@ -1,6 +1,7 @@
 import { expect, test, describe } from 'vitest';
 import { generateAiResponse } from './flowtwinAI';
 import { retrieveStadiumKnowledge } from './ragKnowledge';
+import { classifyUniversalIntent } from './globalIntent';
 
 describe('Shared FlowTwin AI Service', () => {
   const withNoKey = async (fn: () => Promise<void>) => {
@@ -20,6 +21,15 @@ describe('Shared FlowTwin AI Service', () => {
     expect(chunks[0].source).toBe('stadium-policies.json');
     expect(chunks[0].text).toContain('STAY EXACTLY WHERE THEY ARE');
     expect(chunks[0].text).toContain('Do not offer walking directions');
+  });
+
+  test('global intent classifier treats greetings as conversational across personas', async () => {
+    await withNoKey(async () => {
+      await expect(classifyUniversalIntent('hi', 'fan')).resolves.toBe('CONVERSATIONAL');
+      await expect(classifyUniversalIntent('hi', 'volunteer')).resolves.toBe('CONVERSATIONAL');
+      await expect(classifyUniversalIntent('hi', 'ops')).resolves.toBe('CONVERSATIONAL');
+      await expect(classifyUniversalIntent('lost child protocol', 'volunteer')).resolves.toBe('ACTIONABLE');
+    });
   });
 
   test('lost child does not mention fake lockdown (volunteer policy)', async () => {

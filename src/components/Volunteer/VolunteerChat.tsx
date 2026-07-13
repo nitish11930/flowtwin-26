@@ -126,17 +126,18 @@ export default function VolunteerChat() {
         })
       });
       const data = await response.json();
+      const widgetData = data.widgetData;
       
       setMessages(prev => [...prev, {
         id: Date.now().toString(),
         sender: 'bot',
-        text: data.answer || "Sorry, I couldn't find an answer to that.",
-        checklist: data.checklist,
-        recommendedContact: data.recommendedContact,
-        createIncidentSuggested: data.createIncidentSuggested,
-        intent: data.intent,
-        severity: data.severity,
-        requiredDetails: data.requiredDetails
+        text: data.text || widgetData?.answer || "Sorry, I couldn't find an answer to that.",
+        checklist: widgetData?.checklist,
+        recommendedContact: widgetData?.recommendedContact,
+        createIncidentSuggested: widgetData?.createIncidentSuggested,
+        intent: widgetData?.intent,
+        severity: widgetData?.severity,
+        requiredDetails: widgetData?.requiredDetails
       }]);
     } catch (error) {
       console.error(error);

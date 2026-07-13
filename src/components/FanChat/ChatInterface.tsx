@@ -161,71 +161,33 @@ export default function ChatInterface({ gateCSurgeActive }: { gateCSurgeActive: 
 
   const callChatApi = async (messageText: string, isUpdate = false, chatHistory: Message[] = messages) => {
     setIsTyping(true);
-    const needsAccess = messageText.toLowerCase().includes('accessible') || messageText.toLowerCase().includes('wheelchair');
     
     try {
       // Step 1: Check intent via Fan Assistant
       const aiResponse = await fetch('/api/fan-assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userMessage: messageText, messages: chatHistory })
+        body: JSON.stringify({ userMessage: messageText, messages: chatHistory, gateCSurgeActive })
       });
       const aiData = await aiResponse.json();
+      const widgetData = aiData.widgetData;
+      const routeData = widgetData?.routeData;
+      const botText = aiData.text || widgetData?.answer || "I'm here to help.";
 
-      const directAssistantIntents = [
-        'lost_child',
-        'medical',
-        'security',
-        'crowd_help',
-        'food_search',
-        'drink_search',
-        'water_search',
-        'restroom_search',
-        'sponsor_search',
-        'acknowledgement',
-        'general_help'
-      ];
-      
-      if (directAssistantIntents.includes(aiData.intent) || aiData.amenityData) {
-        const botMsg: Message = {
-          id: Date.now().toString(),
-          sender: 'bot',
-          text: aiData.answer,
-          intent: aiData.intent,
-          amenityData: aiData.amenityData,
-          actions: aiData.actions,
-          capturedDetails: aiData.capturedDetails,
-          requiredDetails: aiData.requiredDetails,
-          createIncidentSuggested: aiData.createIncidentSuggested,
-          incidentDraft: aiData.incidentDraft
-        };
-        setMessages(prev => [...prev, botMsg]);
-      } else {
-        // Step 2: It's navigation, get route
-        const routeResponse = await fetch('/api/route-recommendation', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ needsAccess, gateCSurgeActive })
-        });
-        const routeData = await routeResponse.json();
-        
-        if (!routeData.routeData) {
-          throw new Error(routeData.error || "No route found");
-        }
-
-        const combinedRouteData = {
-          ...routeData.routeData,
-          explanation: aiData.answer || ""
-        };
-
-        const botMsg: Message = {
-          id: Date.now().toString(),
-          sender: 'bot',
-          text: isUpdate ? `Update: Live conditions have changed.\n\n${combinedRouteData.explanation}` : combinedRouteData.explanation,
-          routeData: combinedRouteData
-        };
-        setMessages(prev => [...prev, botMsg]);
-      }
+      const botMsg: Message = {
+        id: Date.now().toString(),
+        sender: 'bot',
+        text: isUpdate ? `Update: Live conditions have changed.\n\n${botText}` : botText,
+        intent: widgetData?.intent,
+        routeData,
+        amenityData: widgetData?.amenityData,
+        actions: widgetData?.actions,
+        capturedDetails: widgetData?.capturedDetails,
+        requiredDetails: widgetData?.requiredDetails,
+        createIncidentSuggested: widgetData?.createIncidentSuggested,
+        incidentDraft: widgetData?.incidentDraft
+      };
+      setMessages(prev => [...prev, botMsg]);
     } catch (err) {
       console.error(err);
       setMessages(prev => [...prev, {
