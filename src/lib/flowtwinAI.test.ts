@@ -254,7 +254,7 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
-  test('fan persistent history keeps unresolved lost child in emergency flow', async () => {
+  test('fan topic switch to food bypasses stale unresolved lost child memory', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse(
         'fan_navigation',
@@ -271,20 +271,19 @@ describe('Shared FlowTwin AI Service', () => {
             },
             {
               sender: 'bot',
-              text: 'Code Amber incident draft ready. Stay at Gate C and notify staff now.',
+              text: 'I have alerted our security team. Please stay exactly where you are at Gate C.',
               intent: 'lost_child'
             }
           ]
         }
       );
 
-      expect(res.intent).toBe('lost_child');
-      expect(res.createIncidentSuggested).toBe(true);
+      expect(res.intent).toBe('food_search');
+      expect(res.createIncidentSuggested).not.toBe(true);
+      expect(res.amenityData.amenity.category).toBe('food');
+      expect(res.answer.toLowerCase()).toContain('stall');
       expect(res.answer).not.toContain('Code Amber');
-      expect(res.answer).toContain('security team');
-      expect(res.answer.toLowerCase()).not.toContain('nearest food');
-      expect(res.answer.toLowerCase()).not.toContain('route');
-      expect(res.memoryState.type).toBe('lost_child');
+      expect(res.memoryState?.type).not.toBe('lost_child');
     });
   });
 
@@ -530,6 +529,38 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
+  test('volunteer topic switch to food stall bypasses stale lost child memory', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse(
+        'volunteer_policy',
+        'food stall',
+        {
+          chatHistory: [
+            {
+              sender: 'user',
+              text: 'Lost child incident for Sania, age 12, dark blue shirt, last seen Gate C, guardian contact 9911446670.'
+            },
+            {
+              sender: 'bot',
+              text: 'Code Amber active. Notify security and radio Command Center.',
+              intent: 'lost_child'
+            },
+            {
+              sender: 'user',
+              text: 'food stall'
+            }
+          ]
+        }
+      );
+
+      expect(res.intent).toBe('directions_policy');
+      expect(res.answer).toContain('Directions support');
+      expect(res.answer).toContain('food stalls');
+      expect(res.answer).not.toContain('Code Amber');
+      expect(res.memoryState?.type).not.toBe('lost_child');
+    });
+  });
+
   test('volunteer accessibility quick action bypasses stale emergency memory', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse(
@@ -677,6 +708,33 @@ describe('Shared FlowTwin AI Service', () => {
       expect(directions.answer).toContain('current location');
       expect(translate.intent).toBe('translation_policy');
       expect(translate.answer).toContain('never repeat private');
+    });
+  });
+
+  test('ops crowd topic switch bypasses stale lost child memory', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse(
+        'operations_command',
+        'Gate C crowd status?',
+        {
+          chatHistory: [
+            {
+              sender: 'user',
+              text: 'Lost child incident for Sania, age 12, dark blue shirt, last seen Gate C, guardian contact 9911446670.'
+            },
+            {
+              sender: 'bot',
+              text: 'Code Amber active. Notify security and radio Command Center.',
+              intent: 'lost_child'
+            }
+          ]
+        }
+      );
+
+      expect(res.recommendations[0].description).toContain('Gate C');
+      expect(res.recommendations[0].description).toContain('redirect');
+      expect(res.recommendations[0].title).toContain('Gate C Crowd Status');
+      expect(res.recommendations[0].description).not.toContain('Code Amber');
     });
   });
 

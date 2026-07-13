@@ -45,8 +45,11 @@ export async function generateAiResponse(
 ): Promise<any> {
   const chatHistory = normalizeChatHistory(extraContext?.chatHistory ?? extraContext?.messages);
   const latestMessage = message || getLastUserMessage(chatHistory) || '';
-  const dynamicContext = buildDynamicAiContext(mode, latestMessage, chatHistory, extraContext);
-  const bypassEmergencyMemory = shouldBypassEmergencyMemory(mode, latestMessage, extraContext);
+  const initialDynamicContext = buildDynamicAiContext(mode, latestMessage, chatHistory, extraContext);
+  const bypassEmergencyMemory = shouldBypassEmergencyMemory(mode, latestMessage, extraContext, initialDynamicContext.emergencyState);
+  const dynamicContext = bypassEmergencyMemory
+    ? buildDynamicAiContext(mode, latestMessage, [], extraContext)
+    : initialDynamicContext;
   const safetyMessage = dynamicContext.emergencyState.isActive && bypassEmergencyMemory === false
     ? buildEmergencyMemoryMessage(latestMessage, chatHistory)
     : latestMessage;
@@ -369,17 +372,52 @@ function buildEmergencyPersonaInstruction(mode: AIMode, emergencyType?: Emergenc
   return `Ongoing emergency memory: ${emergencyType === 'medical' ? 'Code Red medical' : 'Code Amber lost child'} is active in this conversation. Bypass standard routing, food, and small-talk flows until the user clearly resolves it. Continue emergency protocol, ask only for missing critical details, and keep the user anchored to safe next actions.`;
 }
 
-function shouldBypassEmergencyMemory(mode: AIMode, message: string, extraContext?: any) {
-  if (mode !== 'volunteer_policy') return false;
-
+function shouldBypassEmergencyMemory(
+  mode: AIMode,
+  message: string,
+  extraContext?: any,
+  emergencyState?: EmergencyMemoryState
+) {
   const quickAction = normalizeQuickAction(extraContext?.quickAction || message);
   const scopedQuickActions = ['lost child', 'medical', 'accessibility', 'crowd', 'directions', 'translate'];
 
-  if (extraContext?.isQuickAction && scopedQuickActions.includes(quickAction)) {
+  if (mode === 'volunteer_policy' && extraContext?.isQuickAction && scopedQuickActions.includes(quickAction)) {
     return true;
   }
 
-  return ['accessibility', 'crowd', 'directions', 'translate'].includes(quickAction);
+  if (mode === 'volunteer_policy' && ['accessibility', 'crowd', 'directions', 'translate'].includes(quickAction)) {
+    return true;
+  }
+
+  if (!emergencyState?.isActive) return false;
+  if (messageContainsEmergencySignal(message)) return false;
+
+  return messageContainsNonEmergencyTopicSwitch(message);
+}
+
+function messageContainsEmergencySignal(message: string) {
+  const lower = message.toLowerCase();
+  return (
+    lower.includes('lost child') ||
+    lower.includes('missing child') ||
+    lower.includes('my child') ||
+    lower.includes('medical') ||
+    lower.includes('hurt') ||
+    lower.includes('injured') ||
+    lower.includes('fainted') ||
+    lower.includes('unconscious') ||
+    lower.includes('chest pain') ||
+    lower.includes('cannot breathe') ||
+    lower.includes('breathing') ||
+    lower.includes('code amber') ||
+    lower.includes('code red') ||
+    /\b(child|kid|son|daughter)\b.*\b(missing|lost)\b/.test(lower)
+  );
+}
+
+function messageContainsNonEmergencyTopicSwitch(message: string) {
+  const lower = message.toLowerCase();
+  return /\b(food|stall|drink|water|restroom|bathroom|toilet|sponsor|route|directions?|wayfind(?:ing)?|exit|seat|accessibility|accessible|wheelchair|crowd|congestion|surge|translate|language|parking|metro|transport|shuttle|nearest|find|reach)\b/.test(lower);
 }
 
 function getSafetyCriticalResponse(mode: AIMode, message: string, responseContext?: any) {
@@ -878,6 +916,29 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
             title: 'Manager Briefing',
             description: 'Gate C is under severe crowd pressure. Active risks: one Code Red medical response and one Code Amber lost-child flow. Next decisions: dispatch medical first aid, keep Security/Guest Services on Code Amber, divert fans from Gate C, and issue safe multilingual announcements.',
             priority: 'critical'
+          }
+        ]
+      };
+    }
+
+    if (
+      lowerMsg.includes('gate c') &&
+      (lowerMsg.includes('crowd') || lowerMsg.includes('status') || lowerMsg.includes('congestion') || lowerMsg.includes('wait')) &&
+      !lowerMsg.includes('incident')
+    ) {
+      return {
+        recommendations: [
+          {
+            type: 'crowd_status',
+            title: 'Gate C Crowd Status',
+            description: 'Gate C remains the highest-pressure entry area. Keep redirecting fans toward Gate A and Gate B, protect accessible lanes, and keep multilingual wayfinding visible before the bottleneck.',
+            priority: 'high'
+          },
+          {
+            type: 'wayfinding',
+            title: 'Fan Flow Adjustment',
+            description: 'Use volunteers and signage to move food, restroom, and seating questions away from Gate C approaches until the wait time drops.',
+            priority: 'medium'
           }
         ]
       };

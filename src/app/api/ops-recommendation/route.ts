@@ -14,7 +14,10 @@ export async function POST(req: Request) {
       return NextResponse.json(toChatPayload(text));
     }
 
-    const response = await generateAiResponse('operations_command', message);
+    const response = await generateAiResponse('operations_command', message, {
+      chatHistory: messages,
+      userRole: 'You are advising an Operations Organizer.'
+    });
     
     let plan = '';
     if (response.recommendations && response.recommendations.length > 0) {
