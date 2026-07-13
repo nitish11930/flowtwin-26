@@ -202,6 +202,7 @@ function buildDynamicAiContext(
   const rag = buildRagContext(latestMessage, mode, emergencyState.type);
   const userRole = extraContext?.userRole || getUserRole(mode);
   const personaInstruction = getPersonaInstruction(mode);
+  const fewShotInstruction = getFewShotInstruction(mode);
   const emergencyInstruction = emergencyState.isActive
     ? buildEmergencyPersonaInstruction(mode, emergencyState.type)
     : 'No unresolved emergency is active in the current conversation memory.';
@@ -210,6 +211,7 @@ function buildDynamicAiContext(
     'You are FlowTwin 26 Single Brain, the persistent GenAI intelligence for FIFA World Cup 2026 stadium operations.',
     `User Role: ${userRole}.`,
     personaInstruction,
+    fewShotInstruction,
     'Do not break the assigned persona.',
     'Return JSON only to the backend API. The answer field must be plain natural language for the user.',
     'Never place raw JSON, internal incident IDs, private contacts, hidden chain-of-thought, or staff-only protocols inside a fan-facing answer.',
@@ -264,6 +266,33 @@ function getPersonaInstruction(mode: AIMode) {
       return 'Announcement persona rules: produce short, safe, public-facing text. Remove private contact data and avoid panic language.';
     default:
       return 'Persona rules: keep responses practical, safe, and grounded in stadium context.';
+  }
+}
+
+function getFewShotInstruction(mode: AIMode) {
+  switch (mode) {
+    case 'fan_navigation':
+      return [
+        'Few-shot fan behavior examples:',
+        'If the fan says an older person cannot use stairs, infer an accessibility need and override shortest-path routing with elevators, ramps, rest, and mobility-cart support.',
+        'If the fan says someone collapsed or cannot breathe, do not route them. Calmly anchor them in place, say medical staff have been alerted, tell them not to move the person, and ask them to wave down a yellow-vest steward.',
+        'If the fan complains about a food line or missing the game, acknowledge the frustration, use live amenity data, and suggest a faster nearby food option with pickup guidance.'
+      ].join(' ');
+    case 'volunteer_policy':
+      return [
+        'Few-shot volunteer behavior examples:',
+        'Angry ticket issue: coach de-escalation first, give exact words to say, move the fan aside for space, walk them to Box Office/manual pass support, and radio a supervisor if escalation continues.',
+        'Broken sparking turnstile: block the device, redirect the line to adjacent turnstiles, log maintenance, and tell the volunteer not to repair it.',
+        'Unattended bag: Code Black. Do not touch the item, clear nearby rows, hold the aisle, and request security.'
+      ].join(' ');
+    case 'operations_command':
+      return [
+        'Few-shot operations behavior examples:',
+        'Transit crisis: respond with Broadcast, Reroute, and Dispatch actions; protect the gate-to-transit bottleneck before fans arrive.',
+        'Lightning or game suspension: trigger severe-weather shelter messaging, clear exposed seating, unlock overflow covered areas, and dispatch volunteers to upper decks.'
+      ].join(' ');
+    default:
+      return 'Few-shot examples: prefer calm, specific, role-appropriate actions grounded in live stadium context.';
   }
 }
 
@@ -540,6 +569,8 @@ function getSafetyCriticalResponse(mode: AIMode, message: string, responseContex
     lowerMsg.includes('medical') ||
     lowerMsg.includes('hurt') ||
     lowerMsg.includes('injured') ||
+    lowerMsg.includes('collapsed') ||
+    lowerMsg.includes('collapse') ||
     lowerMsg.includes('fainted') ||
     lowerMsg.includes('faint') ||
     lowerMsg.includes('dizzy') ||
@@ -663,7 +694,7 @@ function buildFanMedicalAnswer(details: MedicalDetails, missingDetails: string[]
     ? ' If you can, tell me: ' + missingDetails.join(', ') + '.'
     : '';
 
-  return 'This sounds urgent. I have alerted the stadium medical team. Stay at ' + locationText + ', keep the aisle clear, and do not move the person unless there is immediate danger. If they stop breathing or lose consciousness, tell the nearest staff member immediately.' + missingText;
+  return 'Listen to me carefully: stay calm and stay right where you are at ' + locationText + '. I have alerted the stadium medical team and they are on their way. Do not move the person unless there is immediate danger. Keep the area clear, and if there is a yellow-vest steward nearby, wave them down now. If they stop breathing or lose consciousness, tell the nearest staff member immediately.' + missingText;
 }
 
 function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?: any) {
@@ -676,6 +707,29 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
         answer: 'Glad it helped. I can still help with food, water, restrooms, your seat, accessibility support, crowd-safe routes, or finding stadium staff.',
         createIncidentSuggested: false
       };
+    }
+
+    if ((lowerMsg.includes('grandpa') || lowerMsg.includes('grandfather') || lowerMsg.includes('tired') || lowerMsg.includes("can't walk") || lowerMsg.includes('cannot walk')) && (lowerMsg.includes('stairs') || lowerMsg.includes('section 315'))) {
+      return {
+        intent: 'navigation',
+        answer: "I completely understand. Let's avoid the stairs. Use Elevator E2 near the concession stand, about 50 meters to your left, to reach the 300-level concourse beside Section 315. Take your time, and I can help request a mobility cart if he needs extra support.",
+        accessibility: true,
+        crowdAware: true,
+        actions: ['Avoid stairs and escalators', 'Use Elevator E2', 'Pause near the concession stand if he needs rest', 'Ask yellow-vest staff for a mobility cart']
+      };
+    }
+
+    if ((lowerMsg.includes('line') || lowerMsg.includes('queue')) && (lowerMsg.includes('food') || lowerMsg.includes('missing the game') || lowerMsg.includes('ridiculous'))) {
+      const recommendation = findBestAmenity({ category: 'food', avoidCrowds: true, wantsPreOrder: true });
+      if (recommendation) {
+        return {
+          intent: 'food_search',
+          answer: "I know, food lines get really frustrating when you are missing the match. " + buildAmenityAnswer(recommendation, { category: 'food', avoidCrowds: true, wantsPreOrder: true }) + ' Should I guide you there now?',
+          amenityData: recommendation,
+          actions: ['Guide me there', recommendation.bookingAvailable ? 'Reserve pickup' : 'Show backup option', 'Avoid the main concourse line'],
+          crowdAware: true
+        };
+      }
     }
 
     const amenityContext = parseAmenitySearchContext(message);
@@ -755,6 +809,39 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
 
   if (mode === 'volunteer_policy') {
     const quickAction = normalizeQuickAction(message);
+
+    if ((lowerMsg.includes('ticket') || lowerMsg.includes('scan') || lowerMsg.includes('scanner')) && (lowerMsg.includes('screaming') || lowerMsg.includes('angry') || lowerMsg.includes('scammer') || lowerMsg.includes("won't scan") || lowerMsg.includes('will not scan'))) {
+      return {
+        intent: 'conflict_resolution',
+        severity: 'medium',
+        answer: "Take a breath; you can handle this. Step slightly to the side to give them space, keep your hands visible, and say: 'I know this is incredibly frustrating, and I want to get you inside as fast as possible. The scanners have been glitching with screen glare today. Let's walk over to the Box Office window so they can manually print your pass.' If they keep shouting or blocking the lane, radio your Zone Supervisor.",
+        checklist: ['Give the fan space', 'Use the de-escalation script', 'Move to Box Office/manual pass support', 'Radio Zone Supervisor if aggression continues'],
+        recommendedContact: 'Box Office window / Zone Supervisor',
+        createIncidentSuggested: false
+      };
+    }
+
+    if ((lowerMsg.includes('turnstile') || lowerMsg.includes('gate')) && (lowerMsg.includes('broke') || lowerMsg.includes('broken') || lowerMsg.includes('spark') || lowerMsg.includes('sparking'))) {
+      return {
+        intent: 'equipment_failure',
+        severity: 'high',
+        answer: 'Action required immediately: physically block the unsafe turnstile so no fan touches it, redirect the current line to the adjacent turnstiles, and keep the queue moving away from the spark risk. I am logging emergency maintenance for the gate. Do not attempt to fix the equipment yourself.',
+        checklist: ['Block the unsafe turnstile', 'Redirect fans to adjacent turnstiles', 'Keep accessible and emergency lanes clear', 'Log emergency maintenance', 'Do not repair the equipment yourself'],
+        recommendedContact: 'Maintenance Lead and Gate Supervisor',
+        createIncidentSuggested: true
+      };
+    }
+
+    if ((lowerMsg.includes('backpack') || lowerMsg.includes('bag') || lowerMsg.includes('unattended item')) && (lowerMsg.includes('left') || lowerMsg.includes('under a seat') || lowerMsg.includes('no one') || lowerMsg.includes('unattended'))) {
+      return {
+        intent: 'security_unattended_item',
+        severity: 'critical',
+        answer: 'Code Black Protocol: DO NOT touch or move the item. Clear the immediate row, keep fans from approaching the seat, and request security to the exact section now. Stand at the end of the aisle until security arrives.',
+        checklist: ['Do not touch or move the item', 'Clear the immediate row', 'Hold the aisle so no one approaches', 'Radio security with exact section and seat area'],
+        recommendedContact: 'Security Command / nearest security guard',
+        createIncidentSuggested: true
+      };
+    }
 
     if (quickAction === 'crowd' || lowerMsg.includes('crowd') || lowerMsg.includes('congestion') || lowerMsg.includes('surge')) {
       return {
@@ -870,6 +957,56 @@ function getScenarioPatternResponse(mode: AIMode, message: string, extraContext?
   }
 
   if (mode === 'operations_command') {
+    if ((lowerMsg.includes('metro') || lowerMsg.includes('train') || lowerMsg.includes('line 1')) && (lowerMsg.includes('suspended') || lowerMsg.includes('delayed') || lowerMsg.includes('service'))) {
+      return {
+        recommendations: [
+          {
+            type: 'broadcast',
+            title: 'Broadcast Transit Diversion',
+            description: 'Generate a PA and push announcement that Metro Line 1 service is suspended, then direct fans to Rideshare Lot C and South Shuttle buses before they reach the station queue.',
+            priority: 'critical'
+          },
+          {
+            type: 'routing',
+            title: 'Reroute Fan Copilot Traffic',
+            description: 'Immediately penalize Gate A and Metro Station routing in Fan Copilot so exiting fans are guided toward alternate transport exits and shuttle corridors.',
+            priority: 'critical'
+          },
+          {
+            type: 'dispatch',
+            title: 'Staff the Bottleneck',
+            description: 'Send 15 additional crowd-control staff to the Metro Station entrance and Gate A approaches to turn fans before the bottleneck forms.',
+            priority: 'critical'
+          }
+        ]
+      };
+    }
+
+    if (lowerMsg.includes('lightning') || (lowerMsg.includes('game') && lowerMsg.includes('suspended')) || lowerMsg.includes('severe weather')) {
+      return {
+        recommendations: [
+          {
+            type: 'weather_protocol',
+            title: 'Trigger Severe Weather Shelter Messaging',
+            description: 'Send push notifications and PA messages telling fans to leave exposed seating and move calmly into interior concourses immediately.',
+            priority: 'critical'
+          },
+          {
+            type: 'dispatch',
+            title: 'Clear Upper-Deck Seating',
+            description: 'Dispatch volunteers and security to upper decks and uncovered aisles to guide fans into covered concourses without running.',
+            priority: 'critical'
+          },
+          {
+            type: 'capacity',
+            title: 'Open Overflow Interior Areas',
+            description: 'Unlock Media Room B, VIP Lounge corridors, and other approved covered overflow spaces to absorb the concourse capacity surge.',
+            priority: 'high'
+          }
+        ]
+      };
+    }
+
     if (lowerMsg.includes('highest priority') || lowerMsg.includes('priority')) {
       return {
         recommendations: [
@@ -1197,6 +1334,7 @@ function extractMedicalDetails(message: string): MedicalDetails {
   if (/headache|headach|headech/i.test(normalized)) symptoms.push('headache');
   if (/chest pain/i.test(normalized)) symptoms.push('chest pain');
   if (/bleeding/i.test(normalized)) symptoms.push('bleeding');
+  if (/collapsed|collapse/i.test(normalized)) symptoms.push('collapsed');
   if (/fainted|faint/i.test(normalized)) symptoms.push('fainted');
   if (/dizzy/i.test(normalized)) symptoms.push('dizziness');
   if (/hurt|injured|pain/i.test(normalized) && symptoms.length === 0) symptoms.push('pain or injury');

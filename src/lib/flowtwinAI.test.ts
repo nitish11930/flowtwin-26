@@ -232,6 +232,42 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
+  test('fan hidden accessibility need avoids stairs for tired grandpa', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('fan_navigation', "My grandpa is tired and can't walk up these stairs to section 315. Help.");
+
+      expect(res.intent).toBe('navigation');
+      expect(res.accessibility).toBe(true);
+      expect(res.answer).toContain('avoid the stairs');
+      expect(res.answer).toContain('Elevator E2');
+      expect(res.answer).toContain('mobility cart');
+    });
+  });
+
+  test('fan collapsed bathroom panic triggers medical help instead of navigation', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('fan_navigation', 'Someone just collapsed in the bathroom near Gate B! What do I do?');
+
+      expect(res.intent).toBe('medical');
+      expect(res.severity).toBe('red');
+      expect(res.answer).toContain('medical team');
+      expect(res.answer.toLowerCase()).toContain('do not move');
+      expect(res.answer.toLowerCase()).not.toContain('routing engine');
+    });
+  });
+
+  test('fan food-line frustration gets empathetic faster stall option', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('fan_navigation', "This line for food is ridiculous. I'm missing the game.");
+
+      expect(res.intent).toBe('food_search');
+      expect(res.answer).toContain('frustrating');
+      expect(res.answer.toLowerCase()).toContain('queue');
+      expect(res.amenityData.amenity.category).toBe('food');
+      expect(res.crowdAware).toBe(true);
+    });
+  });
+
   test('fan can find Coca-Cola sponsor stall', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse('fan_navigation', 'I want Coca-Cola sponsor stall near Gate A.');
@@ -529,6 +565,41 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
+  test('volunteer angry ticket scan gets de-escalation script', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('volunteer_policy', "A fan is screaming at me because their digital ticket won't scan and they think I'm calling them a scammer.");
+
+      expect(res.intent).toBe('conflict_resolution');
+      expect(res.answer).toContain('I know this is incredibly frustrating');
+      expect(res.answer).toContain('Box Office');
+      expect(res.recommendedContact).toContain('Zone Supervisor');
+    });
+  });
+
+  test('volunteer broken sparking turnstile gets equipment safety workflow', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('volunteer_policy', 'Turnstile 4 at Gate C just broke and sparked. Fans are piling up.');
+
+      expect(res.intent).toBe('equipment_failure');
+      expect(res.severity).toBe('high');
+      expect(res.answer).toContain('block');
+      expect(res.answer).toContain('Do not attempt to fix');
+      expect(res.createIncidentSuggested).toBe(true);
+    });
+  });
+
+  test('volunteer unattended backpack triggers Code Black and no-touch guidance', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('volunteer_policy', "There's a black backpack left under a seat in Section 110. No one is around.");
+
+      expect(res.intent).toBe('security_unattended_item');
+      expect(res.severity).toBe('critical');
+      expect(res.answer).toContain('Code Black');
+      expect(res.answer).toContain('DO NOT touch');
+      expect(res.recommendedContact).toContain('Security');
+    });
+  });
+
   test('volunteer topic switch to food stall bypasses stale lost child memory', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse(
@@ -708,6 +779,27 @@ describe('Shared FlowTwin AI Service', () => {
       expect(directions.answer).toContain('current location');
       expect(translate.intent).toBe('translation_policy');
       expect(translate.answer).toContain('never repeat private');
+    });
+  });
+
+  test('ops transit crisis returns broadcast reroute dispatch plan', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('operations_command', 'Metro Line 1 just suspended service. We have 15,000 fans exiting Gate A in 20 minutes who expect to take that train.');
+
+      expect(res.recommendations).toHaveLength(3);
+      expect(res.recommendations[0].title).toContain('Broadcast');
+      expect(res.recommendations[1].title).toContain('Reroute');
+      expect(res.recommendations[2].description).toContain('15 additional crowd-control staff');
+    });
+  });
+
+  test('ops lightning suspension triggers severe weather shelter plan', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('operations_command', 'Lightning spotted within 5 miles. Game suspended.');
+
+      expect(res.recommendations[0].title).toContain('Severe Weather');
+      expect(res.recommendations[0].description).toContain('interior concourses');
+      expect(res.recommendations[2].description).toContain('Media Room B');
     });
   });
 

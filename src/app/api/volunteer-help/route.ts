@@ -1,41 +1,30 @@
 import { NextResponse } from 'next/server';
-import { GoogleGenAI } from '@google/genai';
-import policies from '@/data/stadium-policies.json';
-import { buildRagContext } from '@/lib/ragKnowledge';
+import { generateAiResponse } from '../../../lib/flowtwinAI';
+import { store } from '@/lib/dataStore';
 import { buildConversationalResponse, classifyUniversalIntent, toChatPayload } from '@/lib/globalIntent';
-
-const ai = new GoogleGenAI({});
 
 export async function POST(req: Request) {
   try {
-    const { question, messages = [] } = await req.json();
-    const intent = await classifyUniversalIntent(question || '', 'volunteer');
+    const { question, message, messages = [], sector, volunteerId, language } = await req.json();
+    const userMessage = message || question || '';
+    const chatHistory = Array.isArray(messages) ? messages : [];
+    const intent = await classifyUniversalIntent(userMessage, 'volunteer');
 
     if (intent === 'CONVERSATIONAL') {
-      const text = await buildConversationalResponse('volunteer', question || '', Array.isArray(messages) ? messages : []);
+      const text = await buildConversationalResponse('volunteer', userMessage, chatHistory);
       return NextResponse.json(toChatPayload(text));
     }
 
-    const rag = buildRagContext(question, 'volunteer_policy');
-    
-    const contextStr = `Policies: ${JSON.stringify(policies, null, 2)}`;
-    
-    const systemPrompt = [
-      'You are a stadium volunteer assistant for FlowTwin Arena.',
-      "Answer strictly using retrieved stadium knowledge and policies.",
-      'Do not hallucinate outside information.',
-      'Keep it concise and operational.',
-      'Retrieved knowledge:',
-      rag.contextText
-    ].join('\n');
-    
-    const response = await ai.models.generateContent({
-      model: 'gemini-2.5-flash',
-      contents: `${systemPrompt}\n\nContext:\n${contextStr}\n\nQuestion: ${question}`
+    const response = await generateAiResponse('volunteer_policy', userMessage, {
+      chatHistory,
+      volunteerId,
+      sector,
+      language,
+      userRole: `You are guiding a ${sector || 'Sector'} Volunteer.`,
+      openIncidents: store.getIncidents().filter(incident => incident.status !== 'resolved')
     });
 
-    const text = response.text || 'I found the relevant volunteer guidance.';
-    return NextResponse.json(toChatPayload(text, { answer: text, retrievedKnowledge: rag.retrieved }));
+    return NextResponse.json(toChatPayload(response.answer || 'I found the relevant volunteer guidance.', response));
   } catch (error: any) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
