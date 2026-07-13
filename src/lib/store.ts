@@ -5,26 +5,34 @@ const STORAGE_KEY = 'flowtwin-shared-state';
 
 export type SharedState = {
   gateCSurgeActive: boolean;
+  announcementDraft?: string;
+  announcementSource?: string;
+  announcementUpdatedAt?: number;
 };
 
 const defaultState: SharedState = {
   gateCSurgeActive: false,
 };
 
+function parseStoredState(value: string | null): SharedState {
+  if (!value) return defaultState;
+
+  try {
+    return { ...defaultState, ...JSON.parse(value) };
+  } catch {
+    return defaultState;
+  }
+}
+
 export function useSharedState() {
   const [state, setState] = useState<SharedState>(defaultState);
 
   useEffect(() => {
-    // Load initial
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored) {
-      setState(JSON.parse(stored));
-    }
+    setState(parseStoredState(localStorage.getItem(STORAGE_KEY)));
 
-    // Listen to changes from other tabs
     const handleStorage = (e: StorageEvent) => {
-      if (e.key === STORAGE_KEY && e.newValue) {
-        setState(JSON.parse(e.newValue));
+      if (e.key === STORAGE_KEY) {
+        setState(parseStoredState(e.newValue));
       }
     };
 
@@ -41,9 +49,9 @@ export function useSharedState() {
 
   useEffect(() => {
     const handleLocalSync = (e: Event) => {
-      const customEvent = e as CustomEvent;
+      const customEvent = e as CustomEvent<SharedState>;
       if (customEvent.detail) {
-        setState(customEvent.detail);
+        setState({ ...defaultState, ...customEvent.detail });
       }
     };
     window.addEventListener('local-storage-sync', handleLocalSync);

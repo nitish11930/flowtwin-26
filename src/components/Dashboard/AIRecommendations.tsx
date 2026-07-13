@@ -7,21 +7,31 @@ export default function AIRecommendations() {
   const { state } = useSharedState();
   const [recommendation, setRecommendation] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isUrgent, setIsUrgent] = useState(false);
 
-  // We re-fetch when gateCSurgeActive changes because it theoretically affects the backend live state.
   useEffect(() => {
     const fetchRecommendations = async () => {
+      if (!state.gateCSurgeActive) {
+        setRecommendation('All clear. Gate C surge mode is off. Gate B is currently the fastest entry option, and standard volunteer coverage is sufficient.');
+        setIsUrgent(false);
+        setIsLoading(false);
+        return;
+      }
+
       setIsLoading(true);
       try {
         const response = await fetch('/api/ops-recommendation', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: 'Analyze operations context and generate action plan' })
+          body: JSON.stringify({ message: 'Gate C is surging. Generate action plan for rerouting fans and public announcements.' })
         });
         const data = await response.json();
         setRecommendation(data.text || data.widgetData?.actionPlan || 'All clear. Standard operations.');
+        setIsUrgent(true);
       } catch (e) {
         console.error(e);
+        setRecommendation('Unable to refresh AI recommendations. Keep Gate C monitored and use manual crowd-control procedures.');
+        setIsUrgent(true);
       } finally {
         setIsLoading(false);
       }
@@ -29,8 +39,6 @@ export default function AIRecommendations() {
     
     fetchRecommendations();
   }, [state.gateCSurgeActive]);
-
-  const isUrgent = recommendation && recommendation !== "All clear. Standard operations.";
 
   return (
     <div className="bg-slate-800 rounded-2xl border border-slate-700 p-6 flex flex-col h-full shadow-lg transition-colors duration-500">

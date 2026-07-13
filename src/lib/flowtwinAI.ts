@@ -1150,6 +1150,9 @@ function summarizeMissingIncidentDetails(openIncidents: any[]) {
 function buildPublicAnnouncement(message: string) {
   const safeMessage = message.replace(/\b\d{7,15}\b/g, '[private contact removed]');
   const lowerSafeMessage = safeMessage.toLowerCase();
+  const isGateAClear = lowerSafeMessage.includes('gate a') && (lowerSafeMessage.includes('open') || lowerSafeMessage.includes('clear'));
+  const isGateBClear = lowerSafeMessage.includes('gate b') && (lowerSafeMessage.includes('open') || lowerSafeMessage.includes('clear') || lowerSafeMessage.includes('faster entry'));
+  const isGateCClear = lowerSafeMessage.includes('gate c') && (lowerSafeMessage.includes('open') || lowerSafeMessage.includes('eased') || lowerSafeMessage.includes('normal'));
   const isGateCCongestion = lowerSafeMessage.includes('gate c') || lowerSafeMessage.includes('congestion');
   const isTransitDelay =
     lowerSafeMessage.includes('train') ||
@@ -1157,6 +1160,39 @@ function buildPublicAnnouncement(message: string) {
     lowerSafeMessage.includes('rail') ||
     lowerSafeMessage.includes('transit');
   const delayMinutes = safeMessage.match(/\b(\d{1,3})\s*(?:min|mins|minute|minutes)\b/i)?.[1] ?? '15';
+
+  if (isGateBClear) {
+    return {
+      english: 'Gate B is currently clear and available for faster entry. Please follow staff directions and keep accessible lanes clear.',
+      spanish: 'La Puerta B esta despejada y disponible para una entrada mas rapida. Siga las indicaciones del personal y mantenga libres los carriles accesibles.',
+      french: 'La porte B est actuellement degagee et disponible pour une entree plus rapide. Veuillez suivre les consignes du personnel et garder les voies accessibles libres.',
+      portuguese: 'O Portao B esta livre e disponivel para entrada mais rapida. Siga a orientacao da equipe e mantenha livres as faixas acessiveis.',
+      arabic: 'Gate B is clear for faster entry. Please follow staff directions and keep accessible lanes clear.',
+      hindi: 'गेट B अभी खाली है और तेज़ entry के लिए उपलब्ध है। कृपया staff के निर्देशों का पालन करें और accessible lanes खाली रखें।'
+    };
+  }
+
+  if (isGateAClear) {
+    return {
+      english: 'Gate A is open with moderate entry flow. For faster entry, fans may also use Gate B. Please follow staff directions.',
+      spanish: 'La Puerta A esta abierta con flujo moderado. Para entrar mas rapido, tambien puede usar la Puerta B. Siga las indicaciones del personal.',
+      french: 'La porte A est ouverte avec un flux modere. Pour une entree plus rapide, les spectateurs peuvent aussi utiliser la porte B. Veuillez suivre les consignes du personnel.',
+      portuguese: 'O Portao A esta aberto com fluxo moderado. Para entrada mais rapida, os torcedores tambem podem usar o Portao B. Siga a orientacao da equipe.',
+      arabic: 'Gate A is open with moderate flow. For faster entry, fans may also use Gate B. Please follow staff directions.',
+      hindi: 'गेट A खुला है और entry flow मध्यम है। तेज़ entry के लिए fans गेट B भी उपयोग कर सकते हैं। कृपया staff के निर्देशों का पालन करें।'
+    };
+  }
+
+  if (isGateCClear && !lowerSafeMessage.includes('surge') && !lowerSafeMessage.includes('heavy')) {
+    return {
+      english: 'Gate C is open with normal entry flow. Please continue to follow volunteer directions and keep accessible lanes clear.',
+      spanish: 'La Puerta C esta abierta con flujo normal. Siga las indicaciones de los voluntarios y mantenga libres los carriles accesibles.',
+      french: 'La porte C est ouverte avec un flux normal. Veuillez suivre les consignes des benevoles et garder les voies accessibles libres.',
+      portuguese: 'O Portao C esta aberto com fluxo normal. Siga a orientacao dos voluntarios e mantenha livres as faixas acessiveis.',
+      arabic: 'Gate C is open with normal entry flow. Please follow volunteer directions and keep accessible lanes clear.',
+      hindi: 'गेट C normal entry flow के साथ खुला है। कृपया volunteers के निर्देशों का पालन करें और accessible lanes खाली रखें।'
+    };
+  }
 
   if (isGateCCongestion) {
     return {

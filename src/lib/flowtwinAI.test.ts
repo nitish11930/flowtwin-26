@@ -881,6 +881,17 @@ describe('Shared FlowTwin AI Service', () => {
     });
   });
 
+  test('announcement creates gate B clear movement message', async () => {
+    await withNoKey(async () => {
+      const res = await generateAiResponse('announcement', 'Gate B is currently clear with an estimated 5 minute wait. Fans may move to Gate B for faster entry.');
+
+      expect(res.english).toContain('Gate B is currently clear');
+      expect(res.spanish).toContain('Puerta B');
+      expect(res.hindi).toContain('गेट B');
+      expect(res.english).toContain('accessible lanes');
+    });
+  });
+
   test('announcement creates real transit delay translations', async () => {
     await withNoKey(async () => {
       const res = await generateAiResponse('announcement', 'train delayed by 15 minutes');
